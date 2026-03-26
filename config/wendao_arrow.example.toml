@@ -1,0 +1,6 @@
+[interface]
+host = "127.0.0.1"
+port = 8080
+route = "/arrow-ipc"
+health_route = "/health"
+content_type = "application/vnd.apache.arrow.stream"
