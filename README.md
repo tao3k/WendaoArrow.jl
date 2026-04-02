@@ -130,6 +130,10 @@ WendaoArrow exposes:
   services
 - `build_stream_flight_service(processor)` for stream-first local Flight
   `DoExchange` services
+- `gateway_flight_client()` for the live Wendao gateway Flight client surface
+- `gateway_repo_search(...)` for the runtime-owned repo-search Flight route
+- `gateway_knowledge_search(...)` for the runtime-owned knowledge-search
+  Flight route
 - `flight_server(service)` for optional `gRPCServer`-backed listener
   composition
 - `serve_flight(processor)` and `serve_stream_flight(processor)` for optional
@@ -169,6 +173,12 @@ WendaoArrow no longer owns a separate runtime carrier for response
 The metadata overlay path now rides on upstream `Arrow.withmetadata(...)`
 instead of package-local wrapper types.
 
+The packaged gateway client surface is explicit and separate from the local
+`v1` scoring-service contract. Gateway search helpers default to
+`x-wendao-schema-version = v2`, target the live runtime-owned routes
+`/search/repos/main` and `/search/knowledge`, and use upstream
+`Arrow.Flight.getflightinfo(...) + doget(...) + table(...)` under the hood.
+
 ## Contract Notes
 
 The stream scoring example returns the contract-shaped response columns
@@ -201,6 +211,12 @@ Optional Flight server extension validation:
 
 ```bash
 .data/WendaoArrow/scripts/test_wendao_arrow_flight.sh
+```
+
+Live gateway benchmark:
+
+```bash
+direnv exec . julia --project=.data/WendaoArrow .data/WendaoArrow/scripts/benchmark_gateway_flight.jl --host 127.0.0.1 --port 9517 --query flight --limit 5 --samples 10
 ```
 
 The package-local regression matrix is split under `test/runtests/` into
