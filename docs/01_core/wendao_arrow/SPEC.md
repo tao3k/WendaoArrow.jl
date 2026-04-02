@@ -2,15 +2,22 @@
 
 ## Purpose
 
-WendaoArrow is a Julia interface package for validating a pluggable Arrow IPC data path from the existing Wendao Rust gateway to Julia over HTTP.
+WendaoArrow is a Julia transport interface package for validating a pluggable
+Arrow-native data path from the existing Wendao Rust gateway to Julia. The
+current package implementation is Flight-only locally and exposes optional
+`gRPCServer`-backed Flight server helpers over the same analyzer-facing
+processor contract.
 
 ## Scope
 
 This MVP covers:
 
-- the reusable Julia HTTP interface
-- generic Arrow request and response transport
-- HTTP handler composition for future analyzers
+- the reusable Julia transport interface
+- generic Arrow request and response transport over Flight
+- package-local Flight `DoExchange` service composition over `Arrow.Flight`
+- optional `gRPCServer`-backed Flight server helpers over the same processor
+  contracts
+- transport-profile documentation for future Flight adoption
 - documentation for Rust gateway integration
 
 This MVP does not cover:
@@ -20,25 +27,45 @@ This MVP does not cover:
 - production Wendao fallback logic
 - dynamic schema negotiation
 - application-specific ranking semantics
+- production-grade Flight operational hardening and remote interoperability
+  coverage
 
 ## Design Principles
 
-- The existing Rust gateway owns transport, timeout, and response validation.
-- WendaoArrow owns Arrow IPC encode and decode plus HTTP handler composition.
+- The existing Rust gateway and future runtime layer own transport selection,
+  timeout, and response validation.
+- WendaoArrow owns the Arrow contract layer plus package-local Flight
+  transport composition.
+- WendaoArrow may expose Flight service and optional server adapters without
+  owning network transport negotiation.
 - Future analyzer packages own domain-specific scoring and schema semantics.
-- Arrow IPC is the canonical payload format across the boundary.
-- The project remains focused on the interface layer until the contract stabilizes.
+- Arrow-native columnar payloads are the canonical data plane across the
+  boundary.
+- Arrow Flight is the preferred transport when the runtime and plugin can
+  negotiate it.
+- The project remains focused on the interface layer until the contract
+  stabilizes.
 
 ## Project Layout
 
 - `docs/01_core/wendao_arrow/`: core project docs
 - `src/`: WendaoArrow Julia package
 - `test/`: package tests
-- `examples/`: passthrough server example
+- `examples/`: Flight startup examples
 - `scripts/`: local helper commands
 
 ## Entry Points
 
 - Julia package entry: `src/WendaoArrow.jl`
-- Example passthrough server: `examples/passthrough_server.jl`
+- Example Flight scoring server: `examples/stream_scoring_flight_server.jl`
+- Local Flight service seam: `build_flight_service` /
+  `build_stream_flight_service`
+- Optional Flight server bridge: `flight_server` / `serve_flight` /
+  `serve_stream_flight`
 - Rust gateway integration anchor: `packages/rust/crates/xiuxian-wendao/src/gateway/`
+
+## Contract References
+
+- Transport profile direction:
+  `docs/01_core/wendao_arrow/architecture/transport-profiles.md`
+- Arrow request and response schema: `docs/01_core/wendao_arrow/architecture/arrow-schema-contract.md`

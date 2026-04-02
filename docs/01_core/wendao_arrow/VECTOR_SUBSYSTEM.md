@@ -4,6 +4,8 @@
 
 WendaoArrow does not own vector semantics. It transports Arrow tables between the existing Rust gateway and future Julia analyzers.
 
+The transport-level request and response contract lives in `architecture/arrow-schema-contract.md`.
+
 ## Recommended Upstream Vector Columns
 
 - `doc_id`: stable candidate identifier
@@ -24,8 +26,9 @@ WendaoArrow does not own vector semantics. It transports Arrow tables between th
   - schema validation
   - transport policy
 - WendaoArrow:
-  - Arrow decode and encode
-  - HTTP handler composition
+  - Arrow Flight request and response handling
+  - package-local transport profile composition
+  - shared request and response contract enforcement
 - Analyzer packages:
   - vector math
   - response column definitions

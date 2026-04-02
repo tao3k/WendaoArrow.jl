@@ -1,0 +1,6 @@
+include("contracts/support.jl")
+include("contracts/scalar_coercions.jl")
+include("contracts/shape.jl")
+include("contracts/optional_coercions.jl")
+include("contracts/metadata.jl")
+include("contracts/scoring_response.jl")

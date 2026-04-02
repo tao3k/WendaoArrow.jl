@@ -1,0 +1,15 @@
+module WendaoArrowExampleSupport
+
+using Arrow
+using Dates
+using Tables
+using WendaoArrow
+
+export build_stream_metadata_example_processor
+export build_stream_scoring_example_processor
+
+include(joinpath("support", "common.jl"))
+include(joinpath("support", "scoring.jl"))
+include(joinpath("support", "metadata.jl"))
+
+end
