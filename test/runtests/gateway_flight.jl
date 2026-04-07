@@ -1,3 +1,29 @@
+@testset "Generic Flight descriptor normalizes route segments" begin
+    @test WendaoArrow.flight_route_descriptor("/graph/structural/rerank").path ==
+          ["graph", "structural", "rerank"]
+    @test WendaoArrow.flight_route_descriptor("graph/structural/filter").path ==
+          ["graph", "structural", "filter"]
+    @test_throws ArgumentError WendaoArrow.flight_route_descriptor("")
+    @test_throws ArgumentError WendaoArrow.flight_route_descriptor("/")
+end
+
+@testset "Generic Flight schema headers follow shared contract" begin
+    headers = Dict(
+        WendaoArrow.flight_schema_headers(
+            schema_version = "v0-draft",
+            headers = ["x-trace-id" => "trace-0"],
+        ),
+    )
+
+    @test headers["x-wendao-schema-version"] == "v0-draft"
+    @test headers["x-trace-id"] == "trace-0"
+
+    default_headers = Dict(WendaoArrow.flight_schema_headers())
+    @test default_headers["x-wendao-schema-version"] == WendaoArrow.DEFAULT_SCHEMA_VERSION
+
+    @test_throws ArgumentError WendaoArrow.flight_schema_headers(schema_version = "")
+end
+
 @testset "Gateway Flight descriptor normalizes route segments" begin
     @test WendaoArrow.gateway_flight_descriptor("/search/repos/main").path ==
           ["search", "repos", "main"]

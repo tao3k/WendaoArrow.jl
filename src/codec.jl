@@ -1,14 +1,60 @@
-function schema_version_metadata()
-    return [("wendao.schema_version" => DEFAULT_SCHEMA_VERSION)]
+function schema_version_metadata(; schema_version::AbstractString = DEFAULT_SCHEMA_VERSION)
+    return ["wendao.schema_version" => _normalized_schema_version(schema_version)]
 end
 
-function _response_schema_metadata(table_like)
+function merge_schema_metadata(
+    metadata_sources...;
+    schema_version::AbstractString = DEFAULT_SCHEMA_VERSION,
+    subject::AbstractString = "WendaoArrow schema metadata",
+)
     merged = Dict{String,String}()
-    for (key, value) in pairs(schema_metadata(table_like))
-        merged[String(key)] = String(value)
+    for metadata in metadata_sources
+        metadata === nothing && continue
+        for entry in _schema_metadata_entries(metadata)
+            entry isa Pair || throw(
+                ArgumentError(
+                    "$(subject) entries must be Pair(key => value); got $(repr(entry))::$(typeof(entry))",
+                ),
+            )
+            key = _normalized_schema_metadata_text(first(entry); label = "$(subject) key")
+            value = _normalized_schema_metadata_text(
+                last(entry);
+                label = "$(subject) value for $(key)",
+            )
+            merged[key] = value
+        end
     end
-    merged["wendao.schema_version"] = DEFAULT_SCHEMA_VERSION
+    merged["wendao.schema_version"] = _normalized_schema_version(schema_version)
     return collect(merged)
+end
+
+function schema_table(
+    table_like;
+    schema_version::AbstractString = DEFAULT_SCHEMA_VERSION,
+    metadata = nothing,
+    colmetadata = nothing,
+    convert::Bool = true,
+)
+    io = IOBuffer()
+    kwargs = Pair{Symbol,Any}[:metadata=>merge_schema_metadata(
+        schema_metadata(table_like),
+        metadata;
+        schema_version = schema_version,
+        subject = "WendaoArrow schema table metadata",
+    ),]
+    !isnothing(colmetadata) && push!(kwargs, :colmetadata => colmetadata)
+    Arrow.write(io, table_like; kwargs...)
+    return Arrow.Table(IOBuffer(take!(io)); convert = convert)
+end
+
+function _response_schema_metadata(
+    table_like;
+    schema_version::AbstractString = DEFAULT_SCHEMA_VERSION,
+)
+    return merge_schema_metadata(
+        schema_metadata(table_like);
+        schema_version = schema_version,
+    )
 end
 
 function schema_metadata(table)
@@ -35,10 +81,36 @@ Base.iterate(stream::ValidatedStream, state) = iterate(stream.inner, state)
 schema_metadata(stream::ValidatedStream) =
     schema_metadata(_validated_batch_table(stream.first_batch))
 
-function _validated_stream(stream, empty_message::AbstractString; subject::AbstractString)
+function _validated_stream(
+    stream,
+    empty_message::AbstractString;
+    subject::AbstractString,
+    expected_schema_version::AbstractString = DEFAULT_SCHEMA_VERSION,
+)
     state = iterate(stream)
     state === nothing && throw(ArgumentError(empty_message))
     first_batch, next_state = state
-    require_schema_version(_validated_batch_table(first_batch); subject = subject)
+    require_schema_version(
+        _validated_batch_table(first_batch);
+        subject = subject,
+        expected = expected_schema_version,
+    )
     return ValidatedStream(stream, first_batch, next_state)
+end
+
+function _schema_metadata_entries(metadata)
+    return metadata isa AbstractVector ? metadata : pairs(metadata)
+end
+
+function _normalized_schema_metadata_text(value; label::AbstractString)
+    text = strip(string(value))
+    isempty(text) && throw(ArgumentError("$(label) must not be blank"))
+    return text
+end
+
+function _normalized_schema_version(schema_version::AbstractString)
+    return _normalized_schema_metadata_text(
+        schema_version;
+        label = "WendaoArrow schema version",
+    )
 end

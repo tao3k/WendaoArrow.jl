@@ -1,5 +1,6 @@
 include("runtests/support.jl")
 include("runtests/contract_helpers.jl")
+include("runtests/schema_table_contracts.jl")
 include("runtests/scoring_metadata_contracts.jl")
 include("runtests/local_flight.jl")
 include("runtests/gateway_flight.jl")

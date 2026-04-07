@@ -59,6 +59,11 @@
 - keep the cross-process Flight regression matrix split into focused
   `test/flight_grpcserver/*` files so metadata and scoring proofs can evolve
   without one monolithic test file
+- keep runtime-generated helper scripts out of the package git surface so only
+  stable human-owned examples remain under `examples/` and `scripts/`, while
+  disposable launch artifacts stay cache-owned under `PRJ_CACHE_HOME`, with
+  any cache-local namespace defined by the caller's own config surface instead
+  of package-local numbered files
 - define gateway timeout and retry expectations for the Rust side
 
 ## Phase 3: Analyzer Package Integration

@@ -65,31 +65,44 @@ function gateway_flight_client(;
     )
 end
 
-function gateway_flight_descriptor(route::AbstractString)
-    normalized = _gateway_required_string(
-        route,
-        "route";
-        subject = "WendaoArrow gateway Flight descriptor",
-    )
+function flight_route_descriptor(
+    route::AbstractString;
+    subject::AbstractString = "WendaoArrow Flight descriptor",
+)
+    normalized = _gateway_required_string(route, "route"; subject = subject)
     segments = filter(!isempty, split(chopprefix(normalized, "/"), "/"))
-    isempty(segments) && throw(
-        ArgumentError(
-            "WendaoArrow gateway Flight descriptor route must contain at least one segment",
-        ),
-    )
+    isempty(segments) &&
+        throw(ArgumentError("$(subject) route must contain at least one segment"))
     return Arrow.Flight.pathdescriptor(segments)
+end
+
+function gateway_flight_descriptor(route::AbstractString)
+    return flight_route_descriptor(route; subject = "WendaoArrow gateway Flight descriptor")
+end
+
+function flight_schema_headers(;
+    schema_version::AbstractString = DEFAULT_SCHEMA_VERSION,
+    headers::AbstractVector{<:Pair} = Pair{String,String}[],
+    subject::AbstractString = "WendaoArrow Flight request",
+)
+    result = Pair{String,String}["x-wendao-schema-version"=>_gateway_required_string(
+        schema_version,
+        "schema_version",
+        subject = subject,
+    ),]
+    append!(result, _gateway_header_pairs(headers; subject = subject))
+    return result
 end
 
 function _gateway_base_headers(;
     schema_version::AbstractString = DEFAULT_GATEWAY_SCHEMA_VERSION,
     headers::AbstractVector{<:Pair} = Pair{String,String}[],
 )
-    result = Pair{String,String}["x-wendao-schema-version"=>_gateway_required_string(
-        schema_version,
-        "schema_version",
-    ),]
-    append!(result, _gateway_header_pairs(headers))
-    return result
+    return flight_schema_headers(
+        schema_version = schema_version,
+        headers = headers,
+        subject = "WendaoArrow gateway Flight request",
+    )
 end
 
 function gateway_repo_search_headers(

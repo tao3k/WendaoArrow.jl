@@ -4,6 +4,68 @@
     @test descriptor.path == collect(WendaoArrow.DEFAULT_FLIGHT_DESCRIPTOR_PATH)
 end
 
+@testset "Flight exchange request wrapper prepares one request" begin
+    descriptor = WendaoArrow.flight_route_descriptor("/graph/structural/rerank")
+    request = WendaoArrow.flight_exchange_request(
+        WendaoArrow.schema_table(sample_table(); schema_version = "v0-draft");
+        descriptor = descriptor,
+        headers = ["x-trace-id" => "trace-0"],
+    )
+    @test request.descriptor.path == ["graph", "structural", "rerank"]
+    @test request.headers == Pair{String,String}["x-trace-id"=>"trace-0"]
+
+    routed_request = WendaoArrow.flight_exchange_request(
+        WendaoArrow.schema_table(sample_table(); schema_version = "v0-draft");
+        route = "/graph/structural/filter",
+    )
+    @test routed_request.descriptor.path == ["graph", "structural", "filter"]
+
+    @test_throws ErrorException WendaoArrow.flight_exchange_request(sample_table())
+    @test_throws ErrorException WendaoArrow.flight_exchange_request(
+        sample_table();
+        descriptor = descriptor,
+        route = "/graph/structural/rerank",
+    )
+end
+
+@testset "Flight exchange request wrapper can invoke local draft service" begin
+    descriptor = WendaoArrow.flight_route_descriptor("/graph/structural/rerank")
+    service = WendaoArrow.build_flight_service(;
+        descriptor = descriptor,
+        expected_schema_version = "v0-draft",
+    ) do table
+        columns = Tables.columntable(table)
+        return WendaoArrow.schema_table(
+            (
+                candidate_id = collect(columns.doc_id),
+                analyzer_score = Float64.(columns.vector_score),
+                final_score = Float64.(columns.vector_score) .+ 1.0,
+            );
+            schema_version = "v0-draft",
+            metadata = ["response.mode" => "draft-roundtrip"],
+        )
+    end
+
+    request = WendaoArrow.flight_exchange_request(
+        WendaoArrow.schema_table(sample_table(); schema_version = "v0-draft");
+        descriptor = descriptor,
+        headers = ["x-trace-id" => "trace-1"],
+    )
+    result_table = WendaoArrow.flight_exchange_table(
+        service,
+        Arrow.Flight.ServerCallContext(),
+        request,
+    )
+    result = Tables.columntable(result_table)
+    metadata = WendaoArrow.schema_metadata(result_table)
+
+    @test result.candidate_id == ["doc-a", "doc-b"]
+    @test result.analyzer_score == [0.9, 0.5]
+    @test result.final_score == [1.9, 1.5]
+    @test metadata["wendao.schema_version"] == "v0-draft"
+    @test metadata["response.mode"] == "draft-roundtrip"
+end
+
 @testset "Flight table service delegates processing" begin
     descriptor = WendaoArrow.flight_descriptor(["wendao", "arrow", "table"])
     service = WendaoArrow.build_flight_service(; descriptor = descriptor) do table

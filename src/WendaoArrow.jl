@@ -27,6 +27,7 @@ export DEFAULT_GATEWAY_SCHEMA_VERSION
 export DEFAULT_SCHEMA_VERSION
 export CacheBackend
 export CacheScope
+export FlightExchangeRequest
 export InterfaceConfig
 export LinkGraphRetrievalMode
 export LinkGraphRetrievalModes
@@ -45,6 +46,10 @@ export config_from_args
 export coerce_string
 export flight_server
 export flight_descriptor
+export flight_exchange_request
+export flight_exchange_table
+export flight_route_descriptor
+export flight_schema_headers
 export gateway_flight_client
 export gateway_flight_descriptor
 export gateway_flight_table
@@ -59,7 +64,9 @@ export require_columns
 export require_column_lengths
 export require_schema_version
 export require_unique_string_column
+export merge_schema_metadata
 export schema_metadata
+export schema_table
 export serve_flight
 export serve_stream_flight
 

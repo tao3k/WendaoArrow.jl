@@ -8,6 +8,15 @@ This contract is transport-neutral. It is the minimum Arrow schema surface that
 Rust, WendaoArrow, and Julia analyzer packages can rely on without embedding
 analyzer-specific logic in the interface layer.
 
+This scorer-style contract also serves as the stable precedent for the first
+family-level compute ABI extension. The memory-family generalization is defined
+by the host RFC `Arrow Schema-First Julia Compute ABI for the Wendao Memory
+Family` in the primary Wendao host repository. That RFC extends this contract
+model into family/profile form while keeping host lifecycle, state mutation,
+fallback, and final mutation authority outside `WendaoArrow.jl`, which remains
+the Julia-side transport, contract, and authoring substrate for compute
+plugins only.
+
 ## Contract Versioning
 
 - Contract version: `v1`
@@ -31,6 +40,44 @@ The packaged WendaoArrow runtime should duplicate `wendao.schema_version = v1`
 into successful Arrow response schema metadata so post-decode tooling can
 inspect the payload contract without relying on transport-specific side
 channels.
+
+## Generic Schema Builder Surface
+
+`WendaoArrow.jl` also exposes a generic schema builder surface for downstream
+Julia packages that need non-promoted or analyzer-specific Arrow tables while
+still relying on WendaoArrow as the transport substrate.
+
+That surface is:
+
+- `merge_schema_metadata(...)`
+- `schema_table(table_like; schema_version = ..., metadata = ..., colmetadata = ...)`
+
+Those helpers do not replace the stable `v1` scoring contract described below.
+They exist so downstream packages can materialize transport-ready Arrow tables
+without taking ownership of the shared `wendao.schema_version` metadata key or
+reimplementing Arrow IPC write/read flows on their own.
+
+The same principle applies to request headers for Flight routes.
+`WendaoArrow.jl` owns the shared schema-version header helper:
+
+- `flight_schema_headers(; schema_version = ..., headers = ...)`
+
+and the generic route-string normalization helper:
+
+- `flight_route_descriptor(route)`
+
+Downstream packages may add their own route-specific headers on top of that
+surface, but the shared `x-wendao-schema-version` header should stay anchored
+to `WendaoArrow.jl`.
+
+For actual request dispatch, the same upstream package now also owns:
+
+- `flight_exchange_request(source; descriptor = ..., headers = ...)`
+- `flight_exchange_table(...)`
+
+Those helpers turn a table source, descriptor, and header set into one
+prepared `DoExchange` request shape that can be reused across local service
+invocation and remote Flight clients.
 
 ## Request Schema
 

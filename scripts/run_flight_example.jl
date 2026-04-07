@@ -30,7 +30,32 @@ function flight_roots(path::AbstractString)
     return roots
 end
 
-function locate_grpcserver()
+function path_within_root(path::AbstractString, root::AbstractString)
+    normalized_path = splitpath(normpath(abspath(path)))
+    normalized_root = splitpath(normpath(abspath(root)))
+    length(normalized_path) >= length(normalized_root) || return false
+    return normalized_path[1:length(normalized_root)] == normalized_root
+end
+
+function allowed_example_roots()
+    roots = String[WENDAO_ROOT]
+    for root in flight_roots(SCRIPT_ROOT)
+        push!(roots, joinpath(root, ".cache"))
+    end
+    return unique(normpath.(abspath.(roots)))
+end
+
+function resolve_example_target(path_arg::AbstractString)
+    candidate =
+        isabspath(path_arg) ? normpath(path_arg) : normpath(joinpath(WENDAO_ROOT, path_arg))
+    isfile(candidate) || error("Flight example does not exist: $candidate")
+    any(path_within_root(candidate, root) for root in allowed_example_roots()) || error(
+        "Flight example path must stay within WendaoArrow or project cache roots: $candidate",
+    )
+    return candidate
+end
+
+function maybe_locate_grpcserver()
     if haskey(ENV, "WENDAO_FLIGHT_GRPCSERVER_PATH")
         candidate = abspath(ENV["WENDAO_FLIGHT_GRPCSERVER_PATH"])
         isdir(candidate) ||
@@ -41,10 +66,7 @@ function locate_grpcserver()
         candidate = joinpath(root, ".cache", "vendor", "gRPCServer.jl")
         isdir(candidate) && return candidate
     end
-    error(
-        "Could not locate vendored gRPCServer.jl. " *
-        "Set WENDAO_FLIGHT_GRPCSERVER_PATH to an explicit checkout path.",
-    )
+    return nothing
 end
 
 function activate_flight_env()
@@ -53,7 +75,16 @@ function activate_flight_env()
     Pkg.develop(PackageSpec(path = WENDAO_ROOT))
     Pkg.develop(PackageSpec(path = ARROW_ROOT))
     Pkg.develop(PackageSpec(path = ARROWTYPES_ROOT))
-    Pkg.develop(PackageSpec(path = locate_grpcserver()))
+    grpcserver = maybe_locate_grpcserver()
+    if !isnothing(grpcserver)
+        Pkg.develop(PackageSpec(path = grpcserver))
+    else
+        error(
+            "Could not locate vendored gRPCServer.jl. " *
+            "Set WENDAO_FLIGHT_GRPCSERVER_PATH to an explicit checkout path " *
+            "or add .cache/vendor/gRPCServer.jl under the repository root.",
+        )
+    end
     Pkg.add("Tables")
     Pkg.instantiate()
     return temp_env
@@ -61,10 +92,7 @@ end
 
 function main(args::Vector{String})
     isempty(args) && error("expected a relative Flight example path")
-    target = normpath(joinpath(WENDAO_ROOT, args[1]))
-    startswith(target, WENDAO_ROOT) ||
-        error("Flight example path must stay within WendaoArrow: $target")
-    isfile(target) || error("Flight example does not exist: $target")
+    target = resolve_example_target(args[1])
 
     activate_flight_env()
     empty!(ARGS)

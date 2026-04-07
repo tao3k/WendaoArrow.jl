@@ -7,6 +7,11 @@ ships package-local `Arrow.Flight.Service` composition plus an optional
 
 The first analyzer package now lives alongside it at `.data/WendaoAnalyzer`.
 
+In this workspace, `Arrow` stays pinned to the upstream `arrow-julia` main
+revision, while `ArrowTypes` resolves from the sibling checkout under
+`.data/arrow-julia/src/ArrowTypes` to avoid local Julia `Pkg` subdirectory
+resolution failures during Flight development.
+
 ## What This Package Owns
 
 WendaoArrow is not the analyzer itself. It owns the Julia-side transport and
@@ -58,38 +63,43 @@ runtime, not to this Julia package.
 Start the stream-first scoring Flight server:
 
 ```bash
-.data/WendaoArrow/scripts/run_stream_scoring_flight_server.sh --host 127.0.0.1 --port 18815
+.data/WendaoArrow.jl/scripts/run_stream_scoring_flight_server.sh --host 127.0.0.1 --port 18815
 ```
 
 Start the metadata-aware Flight server:
 
 ```bash
-.data/WendaoArrow/scripts/run_stream_metadata_flight_server.sh --host 127.0.0.1 --port 18815
+.data/WendaoArrow.jl/scripts/run_stream_metadata_flight_server.sh --host 127.0.0.1 --port 18815
 ```
 
 Start the schema-metadata preservation Flight server:
 
 ```bash
-.data/WendaoArrow/scripts/run_stream_schema_metadata_flight_server.sh --host 127.0.0.1 --port 18815
+.data/WendaoArrow.jl/scripts/run_stream_schema_metadata_flight_server.sh --host 127.0.0.1 --port 18815
 ```
 
 Start the response-`app_metadata` Flight server:
 
 ```bash
-.data/WendaoArrow/scripts/run_stream_app_metadata_flight_server.sh --host 127.0.0.1 --port 18815
+.data/WendaoArrow.jl/scripts/run_stream_app_metadata_flight_server.sh --host 127.0.0.1 --port 18815
 ```
 
 Use TOML:
 
 ```bash
-.data/WendaoArrow/scripts/run_stream_scoring_flight_server.sh --config .data/WendaoArrow/config/wendao_arrow.example.toml
+.data/WendaoArrow.jl/scripts/run_stream_scoring_flight_server.sh --config .data/WendaoArrow.jl/config/wendao_arrow.example.toml
 ```
 
 Or override with flags:
 
 ```bash
-.data/WendaoArrow/scripts/run_stream_scoring_flight_server.sh --host 127.0.0.1 --port 18815
+.data/WendaoArrow.jl/scripts/run_stream_scoring_flight_server.sh --host 127.0.0.1 --port 18815
 ```
+
+The launcher scripts prefer a vendored `.cache/vendor/gRPCServer.jl` checkout
+when present. If no vendored checkout exists, set
+`WENDAO_FLIGHT_GRPCSERVER_PATH` to an explicit local `gRPCServer.jl` checkout
+before starting the Flight examples.
 
 Start an optional Flight listener from Julia when `gRPCServer` is present:
 
@@ -120,12 +130,25 @@ Config precedence is `defaults < TOML < flags`.
 WendaoArrow exposes:
 
 - `schema_metadata(table)` as the stable wrapper over `Arrow.getmetadata(...)`
+- `merge_schema_metadata(...)` for shared schema-metadata overlay with
+  `wendao.schema_version` ownership kept upstream
+- `schema_table(table_like; schema_version = ..., metadata = ..., colmetadata = ...)`
+  for transport-ready Arrow table materialization over arbitrary downstream
+  row contracts
 - `normalize_metadata_values(metadata)` for shared additive request-metadata
   validation
 - `normalize_scoring_response(table_like)` for packaged scoring-style response
   normalization while preserving schema and field metadata
 - `flight_descriptor(path)` as the packaged default-path helper over upstream
   `Arrow.Flight.pathdescriptor(...)`
+- `flight_route_descriptor(route)` for route-string normalization into an
+  Arrow Flight path descriptor
+- `flight_schema_headers(; schema_version = ..., headers = ...)` for shared
+  `x-wendao-schema-version` request-header construction
+- `flight_exchange_request(source; descriptor = ..., headers = ...)` for one
+  prepared `DoExchange` request wrapper
+- `flight_exchange_table(...)` for request-wrapper-driven local or client-side
+  `DoExchange` response decoding
 - `build_flight_service(processor)` for table-first local Flight `DoExchange`
   services
 - `build_stream_flight_service(processor)` for stream-first local Flight
@@ -138,6 +161,33 @@ WendaoArrow exposes:
   composition
 - `serve_flight(processor)` and `serve_stream_flight(processor)` for optional
   Flight listeners when `gRPCServer` is loaded
+
+Downstream Julia packages with custom Arrow row contracts should prefer
+`schema_table(...)` over direct `Arrow.write(...)` calls. That keeps
+`wendao.schema_version` ownership and schema-metadata merging inside
+`WendaoArrow.jl` while leaving route-specific metadata and column choices in
+the downstream package.
+
+Downstream packages that need draft or analyzer-specific Flight routes should
+also prefer `flight_route_descriptor(...)` and `flight_schema_headers(...)`
+instead of rebuilding the shared `x-wendao-schema-version` header contract on
+their own.
+
+Runtime-generated custom scoring helper scripts are not part of the stable
+`WendaoArrow.jl` package surface. They now belong under project-cache
+ownership rooted at `PRJ_CACHE_HOME`, while any cache-local namespace below
+that root is expected to come from the calling lane's own config or descriptor
+surface rather than from package-local numbered files. The canonical checked-in
+example servers remain under `examples/` and `scripts/`.
+
+When a downstream package is ready to actually emit a request, it should
+prefer `flight_exchange_request(...)` and `flight_exchange_table(...)` instead
+of manually threading source, descriptor, and headers at each call site.
+
+The packaged `build_flight_service(...)` and `build_stream_flight_service(...)`
+surfaces now also accept `expected_schema_version = ...`, so draft downstream
+contracts can exercise the same upstream service builder without forking a
+second decode path.
 
 Use the table-first surface when the analyzer wants the entire decoded table at
 once. Use the stream-first surface when the analyzer needs batch-wise Arrow
@@ -228,12 +278,6 @@ contract-error, and response-error files.
 Current Flight verification covers:
 
 - extension loading and non-blocking listener startup
-- single-batch and multi-batch cross-process `pyarrow.flight` and native Julia
-  `Arrow.Flight.Client` happy-path `DoExchange`
-- native Julia client proof through upstream source-based
-  `Arrow.Flight.doexchange(client, source; ...)` plus high-level
-  `Arrow.Flight.table(...)` decoding instead of manual request-channel writes
-  and response-message collection
 - request-side invalid-argument diagnostics for missing columns, duplicate
   `doc_id`, empty `doc_id`, non-numeric and non-finite `vector_score`, and
   invalid schema version
@@ -247,3 +291,35 @@ Current Flight verification covers:
   Flight response paths
 - response `app_metadata` preservation through local Flight plus cross-process
   `pyarrow.flight` and native Julia `DoExchange`
+
+Current cross-process status is narrower than the package-local matrix:
+
+- `test/runtests.jl` does not currently include `test/flight_grpcserver.jl`;
+  run the cross-process matrix directly when debugging transport behavior
+- `test/flight_grpcserver/support.jl` now auto-discovers the repo-local
+  `.data/arrow-julia` checkout so the harness can develop both `Arrow` and
+  `ArrowTypes` without relying on an extra environment variable
+- the harness now accepts either
+  `.cache/arrow-julia-flight-pyenv/bin/python` or
+  `.cache/arrow-julia-flight-pyenv/.venv/bin/python` for the local
+  `pyarrow.flight` environment
+- in the current workspace snapshot, the direct
+  `direnv exec . julia --project=.data/WendaoArrow.jl .data/WendaoArrow.jl/test/flight_grpcserver.jl`
+  matrix now passes for both `pyarrow.flight` and native Julia across scoring,
+  metadata, schema-metadata, and error-contract cases
+- the native Julia transport closure came from two upstream fixes in the local
+  Julia stack:
+  - server-side HTTP/2 SETTINGS no longer emit `ENABLE_PUSH`
+  - public invalid-argument gRPC responses unwrap `ArgumentError` into plain
+    contract text
+- the shared `WendaoArrow.jl` substrate now also has generic cross-process
+  list-column proofs:
+  - native Julia and `pyarrow.flight` pass table-first list request/response
+    roundtrips
+  - native Julia also passes the same list contract over the routed
+    `/graph/structural/rerank` descriptor
+  - native Julia also passes that routed list contract with Search-like
+    additive request headers
+- the remaining native Julia live blocker is therefore narrower than generic
+  list transport: it now sits in the exact `WendaoSearch.jl` `v0-draft`
+  structural contract shape or the current demo processor path

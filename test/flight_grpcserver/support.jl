@@ -55,8 +55,12 @@ function locate_pyarrow_flight_python()
         return candidate
     end
     for root in grpcserver_roots(TEST_ROOT)
-        candidate = joinpath(root, ".cache", "arrow-julia-flight-pyenv", "bin", "python")
-        isfile(candidate) && return candidate
+        for candidate in (
+            joinpath(root, ".cache", "arrow-julia-flight-pyenv", "bin", "python"),
+            joinpath(root, ".cache", "arrow-julia-flight-pyenv", ".venv", "bin", "python"),
+        )
+            isfile(candidate) && return candidate
+        end
     end
     return nothing
 end
@@ -71,6 +75,15 @@ function maybe_local_arrow_checkout()
     return candidate, arrowtypes_root
 end
 
+function maybe_repo_local_arrow_checkout()
+    for root in grpcserver_roots(TEST_ROOT)
+        candidate = joinpath(root, ".data", "arrow-julia")
+        arrowtypes_root = joinpath(candidate, "src", "ArrowTypes")
+        isdir(candidate) && isdir(arrowtypes_root) && return candidate, arrowtypes_root
+    end
+    return nothing
+end
+
 function locked_arrow_sources()
     parsed = TOML.parsefile(joinpath(WENDAO_ROOT, "Project.toml"))
     sources = get(parsed, "sources", Dict{String,Any}())
@@ -82,32 +95,36 @@ function locked_arrow_sources()
     return arrow_source, arrowtypes_source
 end
 
+function package_spec_from_source(name::AbstractString, source::Dict{String,Any})
+    if haskey(source, "path")
+        return PackageSpec(
+            name = String(name),
+            path = normpath(joinpath(WENDAO_ROOT, String(source["path"]))),
+        )
+    end
+    return PackageSpec(
+        name = String(name),
+        url = String(source["url"]),
+        rev = String(source["rev"]),
+        subdir = haskey(source, "subdir") ? String(source["subdir"]) : nothing,
+    )
+end
+
 const TEMP_ENV = mktempdir()
 
 Pkg.activate(TEMP_ENV)
 Pkg.develop(PackageSpec(path = WENDAO_ROOT))
 local_arrow_checkout = maybe_local_arrow_checkout()
+isnothing(local_arrow_checkout) &&
+    (local_arrow_checkout = maybe_repo_local_arrow_checkout())
 if !isnothing(local_arrow_checkout)
     arrow_root, arrowtypes_root = local_arrow_checkout
     Pkg.develop(PackageSpec(path = arrow_root))
     Pkg.develop(PackageSpec(path = arrowtypes_root))
 else
     arrow_source, arrowtypes_source = locked_arrow_sources()
-    Pkg.add(
-        PackageSpec(
-            name = "Arrow",
-            url = String(arrow_source["url"]),
-            rev = String(arrow_source["rev"]),
-        ),
-    )
-    Pkg.add(
-        PackageSpec(
-            name = "ArrowTypes",
-            url = String(arrowtypes_source["url"]),
-            rev = String(arrowtypes_source["rev"]),
-            subdir = String(get(arrowtypes_source, "subdir", "src/ArrowTypes")),
-        ),
-    )
+    Pkg.add(package_spec_from_source("Arrow", arrow_source))
+    Pkg.add(package_spec_from_source("ArrowTypes", arrowtypes_source))
 end
 Pkg.develop(PackageSpec(path = locate_grpcserver()))
 Pkg.add("Tables")
@@ -147,6 +164,28 @@ end
 
 function sample_table()
     return (doc_id = ["doc-a", "doc-b"], vector_score = [0.9, 0.5])
+end
+
+function list_roundtrip_sample_table()
+    return (
+        request_id = ["request-a", "request-b"],
+        anchor_values = [String["graph", "retrieval"], String["shared-tag"]],
+        edge_kinds = [String["depends_on", "semantic_similar"], String["references"]],
+        candidate_node_ids = [String["node-a", "node-b"], String["node-c"]],
+    )
+end
+
+function expected_list_roundtrip_response()
+    return (
+        request_id = ["request-a", "request-b"],
+        echoed_anchor_values = [String["graph", "retrieval"], String["shared-tag"]],
+        echoed_edge_kinds = [
+            String["depends_on", "semantic_similar"],
+            String["references"],
+        ],
+        pin_assignment = [String["node-a"], String["node-c"]],
+        candidate_size = Int64[2, 1],
+    )
 end
 
 function invalid_sample_table()
@@ -283,6 +322,14 @@ function scoring_server_command(port::Integer)
     return flight_server_command("run_stream_scoring_flight_server.sh", port)
 end
 
+function list_roundtrip_server_command(port::Integer)
+    return flight_server_command("run_list_roundtrip_flight_server.sh", port)
+end
+
+function list_route_roundtrip_server_command(port::Integer)
+    return flight_server_command("run_list_route_roundtrip_flight_server.sh", port)
+end
+
 function bad_response_server_command(port::Integer)
     return flight_server_command("run_stream_scoring_bad_response_flight_server.sh", port)
 end
@@ -342,6 +389,14 @@ end
 
 function with_scoring_flight_server(f::Function)
     return with_flight_server(scoring_server_command, f)
+end
+
+function with_list_roundtrip_flight_server(f::Function)
+    return with_flight_server(list_roundtrip_server_command, f)
+end
+
+function with_list_route_roundtrip_flight_server(f::Function)
+    return with_flight_server(list_route_roundtrip_server_command, f)
 end
 
 function with_bad_response_flight_server(f::Function)
@@ -471,6 +526,51 @@ print(json.dumps(payload, sort_keys=True))
   }
   print(json.dumps(payload, sort_keys=True))
   """
+    return Cmd([python, "-c", code, string(port)])
+end
+
+function pyarrow_list_doexchange_command(python::AbstractString, port::Integer)
+    code = raw"""
+import json
+import pyarrow as pa
+import pyarrow.flight as fl
+import sys
+
+port = int(sys.argv[1])
+client = fl.FlightClient(("127.0.0.1", port))
+descriptor = fl.FlightDescriptor.for_path("wendao", "arrow", "exchange")
+writer, reader = client.do_exchange(descriptor)
+schema = pa.schema(
+    [
+        pa.field("request_id", pa.string()),
+        pa.field("anchor_values", pa.list_(pa.string())),
+        pa.field("edge_kinds", pa.list_(pa.string())),
+        pa.field("candidate_node_ids", pa.list_(pa.string())),
+    ],
+    metadata={b"wendao.schema_version": b"v1"},
+)
+request = pa.Table.from_arrays(
+    [
+        pa.array(["request-a", "request-b"]),
+        pa.array([["graph", "retrieval"], ["shared-tag"]], type=pa.list_(pa.string())),
+        pa.array([["depends_on", "semantic_similar"], ["references"]], type=pa.list_(pa.string())),
+        pa.array([["node-a", "node-b"], ["node-c"]], type=pa.list_(pa.string())),
+    ],
+    schema=schema,
+)
+writer.begin(request.schema)
+writer.write_table(request)
+writer.done_writing()
+response = reader.read_all()
+payload = {
+    "candidate_size": response.column("candidate_size").to_pylist(),
+    "echoed_anchor_values": response.column("echoed_anchor_values").to_pylist(),
+    "echoed_edge_kinds": response.column("echoed_edge_kinds").to_pylist(),
+    "pin_assignment": response.column("pin_assignment").to_pylist(),
+    "request_id": response.column("request_id").to_pylist(),
+}
+print(json.dumps(payload, sort_keys=True))
+"""
     return Cmd([python, "-c", code, string(port)])
 end
 
@@ -1107,6 +1207,9 @@ end
 function native_julia_doexchange_table(
     port::Integer;
     multi_batch::Bool = false,
+    source = nothing,
+    descriptor = WendaoArrow.flight_descriptor(),
+    headers::AbstractVector{<:Pair} = Pair{String,String}[],
     metadata = VALID_SCHEMA_VERSION_METADATA,
     include_app_metadata::Bool = false,
 )
@@ -1118,11 +1221,14 @@ function native_julia_doexchange_table(
             grpc = grpc,
             deadline = NATIVE_JULIA_FLIGHT_DEADLINE,
         )
-        source = multi_batch ? Tables.partitioner(sample_batches()) : sample_table()
+        normalized_source =
+            isnothing(source) ?
+            (multi_batch ? Tables.partitioner(sample_batches()) : sample_table()) : source
         req, response = Arrow.Flight.doexchange(
             client,
-            source;
-            descriptor = WendaoArrow.flight_descriptor(),
+            normalized_source;
+            descriptor = descriptor,
+            headers = headers,
             metadata = metadata,
         )
         result = Arrow.Flight.table(
@@ -1135,6 +1241,59 @@ function native_julia_doexchange_table(
     finally
         gRPCClient.grpc_shutdown(grpc)
     end
+end
+
+function native_julia_list_doexchange_table(
+    port::Integer;
+    metadata = VALID_SCHEMA_VERSION_METADATA,
+)
+    return native_julia_doexchange_table(
+        port;
+        source = list_roundtrip_sample_table(),
+        metadata = metadata,
+    )
+end
+
+function _collect_string_lists(values)
+    return [String[item for item in value] for value in values]
+end
+
+function assert_list_roundtrip_columns(response_table, expected)
+    return assert_list_roundtrip_columns(
+        response_table,
+        expected;
+        response_mode = "list-roundtrip",
+    )
+end
+
+function assert_list_roundtrip_columns(
+    response_table,
+    expected;
+    response_mode::AbstractString,
+)
+    columns = Tables.columntable(response_table)
+    @test collect(columns.request_id) == expected.request_id
+    @test _collect_string_lists(columns.echoed_anchor_values) ==
+          expected.echoed_anchor_values
+    @test _collect_string_lists(columns.echoed_edge_kinds) == expected.echoed_edge_kinds
+    @test _collect_string_lists(columns.pin_assignment) == expected.pin_assignment
+    @test Int64.(collect(columns.candidate_size)) == expected.candidate_size
+    metadata = WendaoArrow.schema_metadata(response_table)
+    @test metadata["wendao.schema_version"] == WendaoArrow.DEFAULT_SCHEMA_VERSION
+    @test metadata["response.mode"] == response_mode
+end
+
+function search_like_structural_route_headers()
+    return Pair{String,String}[
+        "x-wendao-schema-version"=>"v1",
+        "x-wendao-search-route-name"=>"structural_rerank",
+        "x-wendao-search-route-path"=>"/graph/structural/rerank",
+        "x-wendao-search-route-status"=>"package_local_draft",
+        "x-wendao-search-payload-kind"=>"request",
+        "x-wendao-search-contract-shape"=>"structural_rerank_request",
+        "x-wendao-search-query-id"=>"query-route-probe",
+        "x-trace-id"=>"trace-route-probe",
+    ]
 end
 
 _grpc_request(req) = hasproperty(req, :request) ? getproperty(req, :request) : req
