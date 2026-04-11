@@ -1,6 +1,7 @@
 const DEFAULT_GATEWAY_REPO_SEARCH_ROUTE = "/search/repos/main"
 const DEFAULT_GATEWAY_KNOWLEDGE_SEARCH_ROUTE = "/search/knowledge"
 const DEFAULT_GATEWAY_RESULT_LIMIT = 10
+const DEFAULT_GATEWAY_FLIGHT_MAX_MESSAGE_LENGTH = 256 * 1024 * 1024
 
 function _gateway_required_string(
     value,
@@ -41,6 +42,8 @@ function gateway_flight_client(;
     host::AbstractString = DEFAULT_HOST,
     port::Integer = DEFAULT_GATEWAY_FLIGHT_PORT,
     deadline::Real = 30,
+    max_send_message_length::Integer = DEFAULT_GATEWAY_FLIGHT_MAX_MESSAGE_LENGTH,
+    max_recieve_message_length::Integer = DEFAULT_GATEWAY_FLIGHT_MAX_MESSAGE_LENGTH,
     kwargs...,
 )
     normalized_host = _gateway_required_string(
@@ -58,9 +61,21 @@ function gateway_flight_client(;
             "WendaoArrow gateway Flight client deadline must be greater than zero; got $(deadline)",
         ),
     )
+    max_send_message_length > 0 || throw(
+        ArgumentError(
+            "WendaoArrow gateway Flight client max_send_message_length must be greater than zero; got $(max_send_message_length)",
+        ),
+    )
+    max_recieve_message_length > 0 || throw(
+        ArgumentError(
+            "WendaoArrow gateway Flight client max_recieve_message_length must be greater than zero; got $(max_recieve_message_length)",
+        ),
+    )
     return Arrow.Flight.Client(
         "grpc://$(normalized_host):$(Int(port))";
         deadline = deadline,
+        max_send_message_length = max_send_message_length,
+        max_recieve_message_length = max_recieve_message_length,
         kwargs...,
     )
 end

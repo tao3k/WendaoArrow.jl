@@ -97,9 +97,10 @@ Or override with flags:
 ```
 
 The launcher scripts prefer a vendored `.cache/vendor/gRPCServer.jl` checkout
-when present. If no vendored checkout exists, set
+when present. If no vendored checkout exists, they next reuse an installed
+`gRPCServer` package from the active Julia depot. Set
 `WENDAO_FLIGHT_GRPCSERVER_PATH` to an explicit local `gRPCServer.jl` checkout
-before starting the Flight examples.
+when you need to override both defaults.
 
 Start an optional Flight listener from Julia when `gRPCServer` is present:
 

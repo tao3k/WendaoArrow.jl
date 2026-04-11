@@ -1,3 +1,40 @@
+const SCHEMA_TABLE_IPC_ALIGNMENT = 64
+
+struct SchemaPartitionedTable{T}
+    source::T
+    metadata::Vector{Pair{String,String}}
+end
+
+function _first_partition(source)
+    state = iterate(Tables.partitions(source))
+    state === nothing && throw(
+        ArgumentError(
+            "WendaoArrow partitioned schema table requires at least one partition",
+        ),
+    )
+    return first(state)
+end
+
+Tables.partitions(table::SchemaPartitionedTable) = Tables.partitions(table.source)
+Tables.schema(table::SchemaPartitionedTable) = Tables.schema(_first_partition(table.source))
+Tables.columns(table::SchemaPartitionedTable) = Tables.columntable(table)
+
+function Tables.columntable(table::SchemaPartitionedTable)
+    partitions = collect(Tables.partitions(table.source))
+    isempty(partitions) && return NamedTuple()
+    length(partitions) == 1 && return Tables.columntable(only(partitions))
+
+    columns_per_partition = map(Tables.columntable, partitions)
+    names = propertynames(first(columns_per_partition))
+    merged_columns = Tuple(
+        reduce(
+            vcat,
+            (collect(getproperty(columns, name)) for columns in columns_per_partition),
+        ) for name in names
+    )
+    return NamedTuple{names}(merged_columns)
+end
+
 function schema_version_metadata(; schema_version::AbstractString = DEFAULT_SCHEMA_VERSION)
     return ["wendao.schema_version" => _normalized_schema_version(schema_version)]
 end
@@ -42,7 +79,11 @@ function schema_table(
         schema_version = schema_version,
         subject = "WendaoArrow schema table metadata",
     ),]
+    if table_like isa Tables.Partitioner
+        return SchemaPartitionedTable(table_like, kwargs[1].second)
+    end
     !isnothing(colmetadata) && push!(kwargs, :colmetadata => colmetadata)
+    push!(kwargs, :alignment => SCHEMA_TABLE_IPC_ALIGNMENT)
     Arrow.write(io, table_like; kwargs...)
     return Arrow.Table(IOBuffer(take!(io)); convert = convert)
 end
@@ -61,6 +102,8 @@ function schema_metadata(table)
     metadata = Arrow.getmetadata(table)
     return metadata === nothing ? Dict{String,String}() : metadata
 end
+
+schema_metadata(table::SchemaPartitionedTable) = Dict{String,String}(table.metadata)
 
 _validated_batch_table(batch) = batch
 _validated_batch_table(batch::NamedTuple{(:table, :app_metadata)}) = batch.table

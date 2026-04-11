@@ -30,6 +30,20 @@ function flight_roots(path::AbstractString)
     return roots
 end
 
+function grpcserver_depot_candidates()
+    candidates = String[]
+    for depot in DEPOT_PATH
+        packages_root = joinpath(depot, "packages", "gRPCServer")
+        isdir(packages_root) || continue
+        for entry in sort(readdir(packages_root))
+            candidate = joinpath(packages_root, entry)
+            isfile(joinpath(candidate, "Project.toml")) || continue
+            push!(candidates, candidate)
+        end
+    end
+    return candidates
+end
+
 function path_within_root(path::AbstractString, root::AbstractString)
     normalized_path = splitpath(normpath(abspath(path)))
     normalized_root = splitpath(normpath(abspath(root)))
@@ -66,6 +80,9 @@ function maybe_locate_grpcserver()
         candidate = joinpath(root, ".cache", "vendor", "gRPCServer.jl")
         isdir(candidate) && return candidate
     end
+    for candidate in grpcserver_depot_candidates()
+        return candidate
+    end
     return nothing
 end
 
@@ -80,9 +97,9 @@ function activate_flight_env()
         Pkg.develop(PackageSpec(path = grpcserver))
     else
         error(
-            "Could not locate vendored gRPCServer.jl. " *
-            "Set WENDAO_FLIGHT_GRPCSERVER_PATH to an explicit checkout path " *
-            "or add .cache/vendor/gRPCServer.jl under the repository root.",
+            "Could not locate gRPCServer.jl. " *
+            "Set WENDAO_FLIGHT_GRPCSERVER_PATH, add .cache/vendor/gRPCServer.jl " *
+            "under the repository root, or install gRPCServer into the active Julia depot.",
         )
     end
     Pkg.add("Tables")

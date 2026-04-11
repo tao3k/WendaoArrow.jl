@@ -1,3 +1,5 @@
+const LARGE_RESPONSE_DOC_ID_BYTES = 8 * 1024 * 1024
+
 function build_stream_scoring_example_processor(;
     request_subject,
     response_subject,

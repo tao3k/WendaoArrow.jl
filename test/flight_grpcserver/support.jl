@@ -31,6 +31,20 @@ function grpcserver_roots(path::AbstractString)
     return roots
 end
 
+function grpcserver_depot_candidates()
+    candidates = String[]
+    for depot in DEPOT_PATH
+        packages_root = joinpath(depot, "packages", "gRPCServer")
+        isdir(packages_root) || continue
+        for entry in sort(readdir(packages_root))
+            candidate = joinpath(packages_root, entry)
+            isfile(joinpath(candidate, "Project.toml")) || continue
+            push!(candidates, candidate)
+        end
+    end
+    return candidates
+end
+
 function locate_grpcserver()
     if haskey(ENV, "WENDAO_FLIGHT_GRPCSERVER_PATH")
         candidate = abspath(ENV["WENDAO_FLIGHT_GRPCSERVER_PATH"])
@@ -42,9 +56,13 @@ function locate_grpcserver()
         candidate = joinpath(root, ".cache", "vendor", "gRPCServer.jl")
         isdir(candidate) && return candidate
     end
+    for candidate in grpcserver_depot_candidates()
+        return candidate
+    end
     error(
-        "Could not locate vendored gRPCServer.jl. " *
-        "Set WENDAO_FLIGHT_GRPCSERVER_PATH to an explicit checkout path.",
+        "Could not locate gRPCServer.jl. " *
+        "Set WENDAO_FLIGHT_GRPCSERVER_PATH, add .cache/vendor/gRPCServer.jl, " *
+        "or install gRPCServer into the active Julia depot.",
     )
 end
 
@@ -58,6 +76,8 @@ function locate_pyarrow_flight_python()
         for candidate in (
             joinpath(root, ".cache", "arrow-julia-flight-pyenv", "bin", "python"),
             joinpath(root, ".cache", "arrow-julia-flight-pyenv", ".venv", "bin", "python"),
+            joinpath(root, ".cache", "wendaosearch-pyarrow-env", "bin", "python"),
+            joinpath(root, ".cache", "wendaosearch-pyarrow-env", ".venv", "bin", "python"),
         )
             isfile(candidate) && return candidate
         end
@@ -322,6 +342,10 @@ function scoring_server_command(port::Integer)
     return flight_server_command("run_stream_scoring_flight_server.sh", port)
 end
 
+function large_response_server_command(port::Integer)
+    return flight_server_command("run_stream_large_response_flight_server.sh", port)
+end
+
 function list_roundtrip_server_command(port::Integer)
     return flight_server_command("run_list_roundtrip_flight_server.sh", port)
 end
@@ -389,6 +413,10 @@ end
 
 function with_scoring_flight_server(f::Function)
     return with_flight_server(scoring_server_command, f)
+end
+
+function with_large_response_flight_server(f::Function)
+    return with_flight_server(large_response_server_command, f)
 end
 
 function with_list_roundtrip_flight_server(f::Function)
@@ -1198,9 +1226,15 @@ function native_julia_doexchange(
     port::Integer;
     multi_batch::Bool = false,
     metadata = VALID_SCHEMA_VERSION_METADATA,
+    client_kwargs...,
 )
     return Tables.columntable(
-        native_julia_doexchange_table(port; multi_batch = multi_batch, metadata = metadata),
+        native_julia_doexchange_table(
+            port;
+            multi_batch = multi_batch,
+            metadata = metadata,
+            client_kwargs...,
+        ),
     )
 end
 
@@ -1212,6 +1246,7 @@ function native_julia_doexchange_table(
     headers::AbstractVector{<:Pair} = Pair{String,String}[],
     metadata = VALID_SCHEMA_VERSION_METADATA,
     include_app_metadata::Bool = false,
+    client_kwargs...,
 )
     grpc = gRPCClient.gRPCCURL()
     gRPCClient.grpc_init(grpc)
@@ -1220,6 +1255,7 @@ function native_julia_doexchange_table(
             "grpc://127.0.0.1:$(port)";
             grpc = grpc,
             deadline = NATIVE_JULIA_FLIGHT_DEADLINE,
+            client_kwargs...,
         )
         normalized_source =
             isnothing(source) ?

@@ -87,6 +87,22 @@ end
         port = 9517,
         deadline = 0,
     )
+    @test_throws ArgumentError WendaoArrow.gateway_flight_client(;
+        host = "127.0.0.1",
+        port = 9517,
+        max_send_message_length = 0,
+    )
+    @test_throws ArgumentError WendaoArrow.gateway_flight_client(;
+        host = "127.0.0.1",
+        port = 9517,
+        max_recieve_message_length = 0,
+    )
+
+    client = WendaoArrow.gateway_flight_client(; host = "127.0.0.1", port = 9517)
+    @test client.max_send_message_length ==
+          WendaoArrow.DEFAULT_GATEWAY_FLIGHT_MAX_MESSAGE_LENGTH
+    @test client.max_recieve_message_length ==
+          WendaoArrow.DEFAULT_GATEWAY_FLIGHT_MAX_MESSAGE_LENGTH
 end
 
 if get(ENV, "WENDAO_GATEWAY_FLIGHT_SMOKE", "0") == "1"

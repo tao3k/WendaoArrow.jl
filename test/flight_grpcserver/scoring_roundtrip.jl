@@ -43,3 +43,19 @@ end
         )
     end
 end
+
+@testset "cross-process Flight startup script serves native Julia DoExchange for large responses" begin
+    with_large_response_flight_server() do port, process
+        @test Base.process_running(process)
+        response = native_julia_doexchange(
+            port;
+            max_send_message_length = WendaoArrow.DEFAULT_GATEWAY_FLIGHT_MAX_MESSAGE_LENGTH,
+            max_recieve_message_length = WendaoArrow.DEFAULT_GATEWAY_FLIGHT_MAX_MESSAGE_LENGTH,
+        )
+        @test length(response.doc_id) == 1
+        @test length(only(response.doc_id)) ==
+              WendaoArrowExampleSupport.LARGE_RESPONSE_DOC_ID_BYTES
+        @test response.analyzer_score == [0.9]
+        @test response.final_score == [0.9]
+    end
+end
