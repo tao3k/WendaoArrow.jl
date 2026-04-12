@@ -17,6 +17,22 @@ end
     end
 end
 
+@testset "cross-process Flight startup script serves native Julia DoExchange over request channel" begin
+    with_scoring_flight_server() do port, process
+        @test Base.process_running(process)
+        response = native_julia_channel_doexchange(port)
+        assert_scoring_columns(response, ["doc-a", "doc-b"], [0.9, 0.5], [0.9, 0.5])
+    end
+end
+
+@testset "cross-process Flight startup script serves native Julia DoExchange through WendaoArrow product helper" begin
+    with_scoring_flight_server() do port, process
+        @test Base.process_running(process)
+        response = product_helper_doexchange(port)
+        assert_scoring_columns(response, ["doc-a", "doc-b"], [0.9, 0.5], [0.9, 0.5])
+    end
+end
+
 @testset "cross-process Flight startup script serves pyarrow DoExchange across multiple batches" begin
     python = locate_pyarrow_flight_python()
     isnothing(python) && error("could not locate pyarrow Flight test environment")
@@ -48,6 +64,22 @@ end
     with_large_response_flight_server() do port, process
         @test Base.process_running(process)
         response = native_julia_doexchange(
+            port;
+            max_send_message_length = WendaoArrow.DEFAULT_GATEWAY_FLIGHT_MAX_MESSAGE_LENGTH,
+            max_recieve_message_length = WendaoArrow.DEFAULT_GATEWAY_FLIGHT_MAX_MESSAGE_LENGTH,
+        )
+        @test length(response.doc_id) == 1
+        @test length(only(response.doc_id)) ==
+              WendaoArrowExampleSupport.LARGE_RESPONSE_DOC_ID_BYTES
+        @test response.analyzer_score == [0.9]
+        @test response.final_score == [0.9]
+    end
+end
+
+@testset "cross-process Flight startup script serves large responses through WendaoArrow product helper" begin
+    with_large_response_flight_server() do port, process
+        @test Base.process_running(process)
+        response = product_helper_doexchange(
             port;
             max_send_message_length = WendaoArrow.DEFAULT_GATEWAY_FLIGHT_MAX_MESSAGE_LENGTH,
             max_recieve_message_length = WendaoArrow.DEFAULT_GATEWAY_FLIGHT_MAX_MESSAGE_LENGTH,

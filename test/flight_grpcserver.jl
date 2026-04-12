@@ -1,6 +1,7 @@
 include("flight_grpcserver/support.jl")
 include("flight_grpcserver/service_bootstrap.jl")
 include("flight_grpcserver/scoring_roundtrip.jl")
+include("flight_grpcserver/parser_summary_roundtrip.jl")
 include("flight_grpcserver/list_roundtrip.jl")
 include("flight_grpcserver/list_route_roundtrip.jl")
 include("flight_grpcserver/app_metadata_roundtrip.jl")

@@ -5,6 +5,9 @@ using TOML
 const SPLIT_TEST_ROOT = @__DIR__
 const TEST_ROOT = normpath(joinpath(SPLIT_TEST_ROOT, ".."))
 const WENDAO_ROOT = normpath(joinpath(TEST_ROOT, ".."))
+const FLIGHT_FIXTURE_ROOT = joinpath(TEST_ROOT, "fixtures")
+const PARSER_SUMMARY_MODELICA_PACKAGE_FIXTURE =
+    joinpath(FLIGHT_FIXTURE_ROOT, "modelica", "Modelica", "Blocks", "package.mo")
 
 function maybe_git_root(path::AbstractString)
     try
@@ -31,18 +34,23 @@ function grpcserver_roots(path::AbstractString)
     return roots
 end
 
-function grpcserver_depot_candidates()
+function grpcclient_repo_candidates()
     candidates = String[]
-    for depot in DEPOT_PATH
-        packages_root = joinpath(depot, "packages", "gRPCServer")
-        isdir(packages_root) || continue
-        for entry in sort(readdir(packages_root))
-            candidate = joinpath(packages_root, entry)
+    for root in grpcserver_roots(TEST_ROOT)
+        for candidate in (joinpath(root, ".data", "gRPCClient.jl"),)
             isfile(joinpath(candidate, "Project.toml")) || continue
+            candidate ∉ candidates || continue
             push!(candidates, candidate)
         end
     end
     return candidates
+end
+
+function locate_grpcclient()
+    for candidate in grpcclient_repo_candidates()
+        return candidate
+    end
+    return nothing
 end
 
 function locate_grpcserver()
@@ -52,17 +60,18 @@ function locate_grpcserver()
             error("WENDAO_FLIGHT_GRPCSERVER_PATH does not exist: $candidate")
         return candidate
     end
-    for root in grpcserver_roots(TEST_ROOT)
-        candidate = joinpath(root, ".cache", "vendor", "gRPCServer.jl")
-        isdir(candidate) && return candidate
-    end
-    for candidate in grpcserver_depot_candidates()
+
+    grpcserver_source = locked_source("gRPCServer")
+    if haskey(grpcserver_source, "path")
+        candidate = normpath(joinpath(WENDAO_ROOT, String(grpcserver_source["path"])))
+        isdir(candidate) ||
+            error("WendaoArrow Project.toml gRPCServer path does not exist: $candidate")
         return candidate
     end
+
     error(
         "Could not locate gRPCServer.jl. " *
-        "Set WENDAO_FLIGHT_GRPCSERVER_PATH, add .cache/vendor/gRPCServer.jl, " *
-        "or install gRPCServer into the active Julia depot.",
+        "Set WENDAO_FLIGHT_GRPCSERVER_PATH or declare a local path in [sources].gRPCServer.",
     )
 end
 
@@ -70,6 +79,8 @@ function locate_pyarrow_flight_python()
     if haskey(ENV, "ARROW_FLIGHT_PYTHON")
         candidate = abspath(ENV["ARROW_FLIGHT_PYTHON"])
         isfile(candidate) || error("ARROW_FLIGHT_PYTHON does not exist: $candidate")
+        pyarrow_flight_available(candidate) ||
+            error("ARROW_FLIGHT_PYTHON does not provide pyarrow.flight: $candidate")
         return candidate
     end
     for root in grpcserver_roots(TEST_ROOT)
@@ -79,10 +90,48 @@ function locate_pyarrow_flight_python()
             joinpath(root, ".cache", "wendaosearch-pyarrow-env", "bin", "python"),
             joinpath(root, ".cache", "wendaosearch-pyarrow-env", ".venv", "bin", "python"),
         )
-            isfile(candidate) && return candidate
+            isfile(candidate) || continue
+            pyarrow_flight_available(candidate) && return candidate
         end
     end
+    candidate = maybe_uv_pyarrow_launcher()
+    isnothing(candidate) && return nothing
+    pyarrow_flight_available(candidate) && return candidate
     return nothing
+end
+
+function maybe_uv_pyarrow_launcher()
+    uv = Sys.which("uv")
+    isnothing(uv) && return nothing
+
+    for root in grpcserver_roots(TEST_ROOT)
+        launcher = joinpath(root, ".cache", "arrow-julia-flight-pyenv", "bin", "python")
+        content = string(
+            "#!/bin/sh\n",
+            "exec ",
+            repr(uv),
+            " run --with pyarrow python \"",
+            Char('$'),
+            "@\"\n",
+        )
+        mkpath(dirname(launcher))
+        if !isfile(launcher) || read(launcher, String) != content
+            write(launcher, content)
+            chmod(launcher, 0o755)
+        end
+        return launcher
+    end
+    return nothing
+end
+
+function pyarrow_flight_available(candidate::AbstractString)
+    try
+        command = `$candidate -c "import pyarrow as pa; import pyarrow.flight as fl"`
+        run(pipeline(command; stdout = devnull, stderr = devnull))
+        return true
+    catch
+        return false
+    end
 end
 
 function maybe_local_arrow_checkout()
@@ -104,15 +153,16 @@ function maybe_repo_local_arrow_checkout()
     return nothing
 end
 
-function locked_arrow_sources()
+function locked_source(name::AbstractString)
     parsed = TOML.parsefile(joinpath(WENDAO_ROOT, "Project.toml"))
     sources = get(parsed, "sources", Dict{String,Any}())
-    arrow_source = get(sources, "Arrow", nothing)
-    arrowtypes_source = get(sources, "ArrowTypes", nothing)
-    isnothing(arrow_source) && error("WendaoArrow Project.toml is missing [sources].Arrow")
-    isnothing(arrowtypes_source) &&
-        error("WendaoArrow Project.toml is missing [sources].ArrowTypes")
-    return arrow_source, arrowtypes_source
+    source = get(sources, String(name), nothing)
+    isnothing(source) && error("WendaoArrow Project.toml is missing [sources].$(name)")
+    return source
+end
+
+function locked_arrow_sources()
+    return locked_source("Arrow"), locked_source("ArrowTypes")
 end
 
 function package_spec_from_source(name::AbstractString, source::Dict{String,Any})
@@ -147,8 +197,13 @@ else
     Pkg.add(package_spec_from_source("ArrowTypes", arrowtypes_source))
 end
 Pkg.develop(PackageSpec(path = locate_grpcserver()))
+local_grpcclient_checkout = locate_grpcclient()
+if !isnothing(local_grpcclient_checkout)
+    Pkg.develop(PackageSpec(path = local_grpcclient_checkout))
+else
+    Pkg.add("gRPCClient")
+end
 Pkg.add("Tables")
-Pkg.add("gRPCClient")
 Pkg.instantiate()
 
 using Test
@@ -158,6 +213,8 @@ using Tables
 using WendaoArrow
 using gRPCServer
 using gRPCClient
+
+include(joinpath(WENDAO_ROOT, "examples", "support.jl"))
 
 const CACHE_BACKEND_EXTENSION_NAME = "JuliaLang.Enum"
 const CACHE_BACKEND_EXTENSION_METADATA = "type=WendaoArrow.CacheBackend;labels=memory:1,disk:2,remote:3"
@@ -184,6 +241,24 @@ end
 
 function sample_table()
     return (doc_id = ["doc-a", "doc-b"], vector_score = [0.9, 0.5])
+end
+
+function parser_summary_fixture_source_text()
+    isfile(PARSER_SUMMARY_MODELICA_PACKAGE_FIXTURE) ||
+        error("missing parser-summary fixture: $(PARSER_SUMMARY_MODELICA_PACKAGE_FIXTURE)")
+    return read(PARSER_SUMMARY_MODELICA_PACKAGE_FIXTURE, String)
+end
+
+function parser_summary_request_table(;
+    request_id::AbstractString = "req-modelica-package",
+    source_id::AbstractString = "Modelica/Blocks/package.mo",
+    source_text::AbstractString = parser_summary_fixture_source_text(),
+)
+    return (
+        request_id = [String(request_id)],
+        source_id = [String(source_id)],
+        source_text = [String(source_text)],
+    )
 end
 
 function list_roundtrip_sample_table()
@@ -346,6 +421,14 @@ function large_response_server_command(port::Integer)
     return flight_server_command("run_stream_large_response_flight_server.sh", port)
 end
 
+function parser_summary_like_server_command(port::Integer)
+    return flight_server_command("run_stream_parser_summary_like_flight_server.sh", port)
+end
+
+function parser_summary_request_server_command(port::Integer)
+    return flight_server_command("run_stream_parser_summary_request_flight_server.sh", port)
+end
+
 function list_roundtrip_server_command(port::Integer)
     return flight_server_command("run_list_roundtrip_flight_server.sh", port)
 end
@@ -417,6 +500,14 @@ end
 
 function with_large_response_flight_server(f::Function)
     return with_flight_server(large_response_server_command, f)
+end
+
+function with_parser_summary_like_flight_server(f::Function)
+    return with_flight_server(parser_summary_like_server_command, f)
+end
+
+function with_parser_summary_request_flight_server(f::Function)
+    return with_flight_server(parser_summary_request_server_command, f)
 end
 
 function with_list_roundtrip_flight_server(f::Function)
@@ -1277,6 +1368,118 @@ function native_julia_doexchange_table(
     finally
         gRPCClient.grpc_shutdown(grpc)
     end
+end
+
+function native_julia_channel_doexchange(
+    port::Integer;
+    multi_batch::Bool = false,
+    metadata = VALID_SCHEMA_VERSION_METADATA,
+    client_kwargs...,
+)
+    return Tables.columntable(
+        native_julia_channel_doexchange_table(
+            port;
+            multi_batch = multi_batch,
+            metadata = metadata,
+            client_kwargs...,
+        ),
+    )
+end
+
+function native_julia_channel_doexchange_table(
+    port::Integer;
+    multi_batch::Bool = false,
+    source = nothing,
+    descriptor = WendaoArrow.flight_descriptor(),
+    headers::AbstractVector{<:Pair} = Pair{String,String}[],
+    metadata = VALID_SCHEMA_VERSION_METADATA,
+    include_app_metadata::Bool = false,
+    client_kwargs...,
+)
+    grpc = gRPCClient.gRPCCURL()
+    gRPCClient.grpc_init(grpc)
+    try
+        client = Arrow.Flight.Client(
+            "grpc://127.0.0.1:$(port)";
+            grpc = grpc,
+            deadline = NATIVE_JULIA_FLIGHT_DEADLINE,
+            client_kwargs...,
+        )
+        normalized_source =
+            isnothing(source) ?
+            (multi_batch ? Tables.partitioner(sample_batches()) : sample_table()) : source
+        req, request, response = Arrow.Flight.doexchange(client; headers = headers)
+        producer = @async Arrow.Flight.putflightdata!(
+            request,
+            normalized_source;
+            close = true,
+            descriptor = descriptor,
+            metadata = metadata,
+        )
+        result = Arrow.Flight.table(
+            response;
+            convert = true,
+            include_app_metadata = include_app_metadata,
+        )
+        wait(producer)
+        gRPCClient.grpc_async_await(req)
+        return result
+    finally
+        gRPCClient.grpc_shutdown(grpc)
+    end
+end
+
+function product_helper_doexchange(
+    port::Integer;
+    multi_batch::Bool = false,
+    client_kwargs...,
+)
+    return Tables.columntable(
+        product_helper_doexchange_table(port; multi_batch = multi_batch, client_kwargs...),
+    )
+end
+
+function _schema_wrapped_source(source)
+    return WendaoArrow.schema_table(
+        source;
+        schema_version = WendaoArrow.DEFAULT_SCHEMA_VERSION,
+    )
+end
+
+function _schema_wrapped_source(source::Tables.Partitioner)
+    wrapped = [_schema_wrapped_source(batch) for batch in Tables.partitions(source)]
+    return Tables.partitioner(wrapped)
+end
+
+function product_helper_doexchange_table(
+    port::Integer;
+    multi_batch::Bool = false,
+    source = nothing,
+    descriptor = WendaoArrow.flight_descriptor(),
+    headers::AbstractVector{<:Pair} = Pair{String,String}[],
+    include_app_metadata::Bool = false,
+    client_kwargs...,
+)
+    client = WendaoArrow.gateway_flight_client(;
+        host = WendaoArrow.DEFAULT_HOST,
+        port = port,
+        deadline = NATIVE_JULIA_FLIGHT_DEADLINE,
+        client_kwargs...,
+    )
+    normalized_source =
+        isnothing(source) ?
+        (multi_batch ? Tables.partitioner(sample_batches()) : sample_table()) : source
+    request = WendaoArrow.flight_exchange_request(
+        _schema_wrapped_source(normalized_source);
+        descriptor = descriptor,
+        headers = headers,
+    )
+    return WendaoArrow.flight_exchange_table(
+        client,
+        request;
+        convert = true,
+        include_app_metadata = include_app_metadata,
+    )
 end
 
 function native_julia_list_doexchange_table(

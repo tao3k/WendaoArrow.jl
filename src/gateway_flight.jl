@@ -166,7 +166,7 @@ function gateway_flight_table(
     info = Arrow.Flight.getflightinfo(client, descriptor; headers = headers)
     endpoint = only(info.endpoint)
     req, channel = Arrow.Flight.doget(client, endpoint.ticket; headers = headers)
-    wait(req)
+    _await_flight_request(req)
     return Arrow.Flight.table(
         channel;
         schema = info,

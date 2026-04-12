@@ -76,8 +76,61 @@ function flight_exchange_table(
         convert = convert,
         include_app_metadata = include_app_metadata,
     )
-    wait(req)
+    _await_flight_request(req)
     return result
+end
+
+function _await_flight_request(req)
+    wait(req)
+    inner = _flight_transport_request(req)
+    _rethrow_flight_request_error(inner)
+    return inner
+end
+
+function _flight_transport_request(req::T) where {T}
+    return hasfield(T, :request) ? _flight_transport_request(getfield(req, :request)) : req
+end
+
+function _rethrow_flight_request_error(req::T) where {T}
+    if hasfield(T, :ex)
+        ex = getfield(req, :ex)
+        isnothing(ex) || throw(ex)
+    end
+
+    if hasfield(T, :grpc_status)
+        grpc_status = getfield(req, :grpc_status)
+        if grpc_status != 0
+            grpc_message = hasfield(T, :grpc_message) ? getfield(req, :grpc_message) : ""
+            throw(
+                ErrorException(
+                    "Flight request failed with grpc-status $(grpc_status): $(grpc_message)",
+                ),
+            )
+        end
+    end
+
+    if hasfield(T, :code)
+        code = getfield(req, :code)
+        if code != 0
+            throw(
+                ErrorException(
+                    "Flight request failed with curl code $(code): $(_curl_error_message(req))",
+                ),
+            )
+        end
+    end
+
+    return req
+end
+
+function _curl_error_message(req::T) where {T}
+    hasfield(T, :errbuf) || return ""
+    errbuf = getfield(req, :errbuf)
+    errbuf isa AbstractVector{UInt8} || return ""
+    nul_index = findfirst(==(0x00), errbuf)
+    last_index = isnothing(nul_index) ? length(errbuf) : max(0, nul_index - 1)
+    last_index == 0 && return ""
+    return String(errbuf[1:last_index])
 end
 
 _flight_request_table(request) = request

@@ -77,8 +77,12 @@ function maybe_locate_grpcserver()
         return candidate
     end
     for root in flight_roots(SCRIPT_ROOT)
-        candidate = joinpath(root, ".cache", "vendor", "gRPCServer.jl")
-        isdir(candidate) && return candidate
+        for candidate in (
+            joinpath(root, ".data", "gRPCServer.jl"),
+            joinpath(root, ".cache", "vendor", "gRPCServer.jl"),
+        )
+            isdir(candidate) && return candidate
+        end
     end
     for candidate in grpcserver_depot_candidates()
         return candidate

@@ -216,6 +216,12 @@ analyzer-provided field metadata when packaged normalization runs through
 `normalize_scoring_response(...)`, force `wendao.schema_version = v1`, and do
 not echo the request descriptor back into outbound `FlightData`.
 
+The package-local `test/flight_grpcserver/parser_summary_roundtrip.jl` lane now
+also treats the committed `package.mo` parser-summary request as the canonical
+large-response transport contract. That proof distinguishes cold-start request
+cost from warm same-server transport cost so transport work is not conflated
+with child-process startup or first-request JIT.
+
 When a processor needs sideband batch diagnostics or provenance on the Flight
 wire, wrap the response in upstream `Arrow.Flight.withappmetadata(...)`.
 WendaoArrow no longer owns a separate runtime carrier for response

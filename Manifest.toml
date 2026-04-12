@@ -1,6 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.12.5"
+julia_version = "1.12.6"
 manifest_format = "2.0"
 project_hash = "618b24ca7a121e9e6ffb78dd3b3afd4f6ead6045"
 
@@ -10,8 +10,8 @@ version = "1.1.2"
 
 [[deps.Arrow]]
 deps = ["ArrowTypes", "Base64", "BitIntegers", "CodecLz4", "CodecZstd", "ConcurrentUtilities", "DataAPI", "Dates", "EnumX", "JSON3", "Mmap", "PooledArrays", "ProtoBuf", "SentinelArrays", "StringViews", "Tables", "TimeZones", "TranscodingStreams", "UUIDs", "gRPCClient"]
-git-tree-sha1 = "a3c01904cf3dc40e9cfc7b7ae64e521090635214"
-repo-rev = "a565249f6d3dd982d1f58e13b994443ed42953ac"
+git-tree-sha1 = "186425269bddc824fba3186af997399e84e22243"
+repo-rev = "37df90f9fef98c488a8fa94e0989e953cfae4967"
 repo-url = "https://github.com/JuliaCN/arrow-julia.git"
 uuid = "69666777-d1a9-59fb-9406-91d4454c9d45"
 version = "2.8.1"
@@ -24,8 +24,8 @@ version = "2.8.1"
 
 [[deps.ArrowTypes]]
 deps = ["Sockets", "UUIDs"]
-git-tree-sha1 = "883a44cb0645fa29413be8c7890ac01028063da3"
-repo-rev = "a565249f6d3dd982d1f58e13b994443ed42953ac"
+git-tree-sha1 = "06998e7303d1e78e3ea544cf55c001966f2fe86f"
+repo-rev = "37df90f9fef98c488a8fa94e0989e953cfae4967"
 repo-subdir = "src/ArrowTypes"
 repo-url = "https://github.com/JuliaCN/arrow-julia.git"
 uuid = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
