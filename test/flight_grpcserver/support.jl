@@ -235,6 +235,43 @@ function wait_for_port(
     error("Timed out waiting for Flight server on $host:$port")
 end
 
+function wait_for_readiness_probe(readiness_probe::Function, port::Integer)
+    try
+        readiness_probe(port)
+        return true
+    catch err
+        return false, err
+    end
+end
+
+function wait_for_flight_server_readiness(
+    port::Integer,
+    process::Base.Process;
+    timeout::Float64 = 30.0,
+    readiness_probe::Union{Nothing,Function} = nothing,
+)
+    isnothing(readiness_probe) && return nothing
+
+    deadline = time() + timeout
+    last_error = nothing
+    while time() < deadline
+        if !Base.process_running(process)
+            wait(process)
+            error("Flight server exited before readiness probe succeeded")
+        end
+        probe_result = wait_for_readiness_probe(readiness_probe, port)
+        if probe_result === true
+            return nothing
+        end
+        _, last_error = probe_result
+        sleep(0.1)
+    end
+
+    detail =
+        isnothing(last_error) ? "unknown readiness failure" : sprint(showerror, last_error)
+    error("Timed out waiting for Flight server readiness on port $port: $detail")
+end
+
 function is_pyarrow_transient_transport_output(output::AbstractString)
     return any(occursin(pattern, output) for pattern in PYARROW_TRANSIENT_TRANSPORT_ERRORS)
 end
@@ -273,7 +310,11 @@ function terminate_process(process::Base.Process)
     return nothing
 end
 
-function _start_flight_server(command_builder::Function; startup_attempts::Integer = 3)
+function _start_flight_server(
+    command_builder::Function;
+    startup_attempts::Integer = 3,
+    readiness_probe::Union{Nothing,Function} = nothing,
+)
     last_error = nothing
     last_output = ""
     for attempt = 1:startup_attempts
@@ -287,6 +328,11 @@ function _start_flight_server(command_builder::Function; startup_attempts::Integ
         close(output_io)
         try
             wait_for_port(WendaoArrow.DEFAULT_HOST, port, process)
+            wait_for_flight_server_readiness(
+                port,
+                process;
+                readiness_probe = readiness_probe,
+            )
             return port, process
         catch err
             last_output = isfile(output_path) ? read(output_path, String) : ""
@@ -395,8 +441,12 @@ function metadata_bad_retrieval_mode_response_server_command(port::Integer)
     )
 end
 
-function with_flight_server(command_builder::Function, f::Function)
-    port, process = _start_flight_server(command_builder)
+function with_flight_server(
+    command_builder::Function,
+    f::Function;
+    readiness_probe::Union{Nothing,Function} = nothing,
+)
+    port, process = _start_flight_server(command_builder; readiness_probe = readiness_probe)
     try
         return f(port, process)
     finally
@@ -409,7 +459,11 @@ function with_scoring_flight_server(f::Function)
 end
 
 function with_large_response_flight_server(f::Function)
-    return with_flight_server(large_response_server_command, f)
+    return with_flight_server(
+        large_response_server_command,
+        f;
+        readiness_probe = large_response_flight_readiness_probe,
+    )
 end
 
 function with_parser_summary_like_flight_server(f::Function)
@@ -1347,6 +1401,18 @@ function product_helper_doexchange(
     return Tables.columntable(
         product_helper_doexchange_table(port; multi_batch = multi_batch, client_kwargs...),
     )
+end
+
+function empty_scoring_response(response)::Bool
+    return isempty(response.doc_id) &&
+           isempty(response.analyzer_score) &&
+           isempty(response.final_score)
+end
+
+function large_response_flight_readiness_probe(port::Integer)
+    response = product_helper_doexchange(port)
+    empty_scoring_response(response) || return nothing
+    error("large-response Flight server returned an empty response during readiness probe")
 end
 
 function _schema_wrapped_source(source)
