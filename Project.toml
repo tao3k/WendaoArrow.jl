@@ -18,9 +18,9 @@ gRPCServer = "608c6337-0d7d-447f-bb69-0f5674ee3959"
 WendaoArrowgRPCServerExt = "gRPCServer"
 
 [sources]
-Arrow = { url = "https://github.com/JuliaCN/arrow-julia.git", rev = "37df90f9fef98c488a8fa94e0989e953cfae4967" }
-ArrowTypes = { url = "https://github.com/JuliaCN/arrow-julia.git", subdir = "src/ArrowTypes", rev = "37df90f9fef98c488a8fa94e0989e953cfae4967" }
-gRPCServer = { url = "https://github.com/tao3k/gRPCServer.jl.git", rev = "92c75a6391355476d9a75f9550b89134efc42704" }
+Arrow = { url = "https://github.com/JuliaCN/arrow-julia.git", rev = "509f7a709d487f4997a7f90213bb28c065ebb309" }
+ArrowTypes = { url = "https://github.com/JuliaCN/arrow-julia.git", subdir = "src/ArrowTypes", rev = "509f7a709d487f4997a7f90213bb28c065ebb309" }
+gRPCServer = { url = "https://github.com/tao3k/gRPCServer.jl.git", rev = "1d577174be169ccc1cd708c9124716b181165e80" }
 
 [compat]
 Arrow = "2"
