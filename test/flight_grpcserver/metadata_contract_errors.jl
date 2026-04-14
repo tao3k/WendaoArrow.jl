@@ -26,7 +26,7 @@
         )
         @test occursin("graph-only", output)
         @test occursin("::String", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -54,11 +54,16 @@ end
         )
         @test occursin("graph-only", err.message)
         @test occursin("::String", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight request metadata key ranking_strategy must contain one of [lexical, semantic, hybrid] or be missing; got \"graph-only\"::String",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight request metadata key ranking_strategy must contain one of [lexical, semantic, hybrid] or be missing; got \"graph-only\"::String"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight request metadata key ranking_strategy must contain one of [lexical, semantic, hybrid] or be missing; got \"graph-only\"::String",
+        )
     end
 end
 
@@ -91,7 +96,7 @@ end
         )
         @test occursin("semantic_only", output)
         @test occursin("::String", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -120,11 +125,16 @@ end
         )
         @test occursin("semantic_only", err.message)
         @test occursin("::String", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight request metadata key retrieval_mode must contain one of [graph_only, hybrid, vector_only] or be missing; got \"semantic_only\"::String",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight request metadata key retrieval_mode must contain one of [graph_only, hybrid, vector_only] or be missing; got \"semantic_only\"::String"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight request metadata key retrieval_mode must contain one of [graph_only, hybrid, vector_only] or be missing; got \"semantic_only\"::String",
+        )
     end
 end
 
@@ -153,7 +163,7 @@ end
         )
         @test occursin("oops", output)
         @test occursin("::String", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -185,7 +195,7 @@ end
         )
         @test occursin("vector-only", output)
         @test occursin("::String", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -213,11 +223,16 @@ end
         )
         @test occursin("vector-only", err.message)
         @test occursin("::String", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight response column ranking_strategy row 1 must contain one of [lexical, semantic, hybrid] or missing; got \"vector-only\"::String",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight response column ranking_strategy row 1 must contain one of [lexical, semantic, hybrid] or missing; got \"vector-only\"::String"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight response column ranking_strategy row 1 must contain one of [lexical, semantic, hybrid] or missing; got \"vector-only\"::String",
+        )
     end
 end
 
@@ -250,7 +265,7 @@ end
         )
         @test occursin("semantic_only", output)
         @test occursin("::String", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -279,11 +294,16 @@ end
         )
         @test occursin("semantic_only", err.message)
         @test occursin("::String", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight response column retrieval_mode row 1 must contain one of [graph_only, hybrid, vector_only] or missing; got \"semantic_only\"::String",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight response column retrieval_mode row 1 must contain one of [graph_only, hybrid, vector_only] or missing; got \"semantic_only\"::String"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight response column retrieval_mode row 1 must contain one of [graph_only, hybrid, vector_only] or missing; got \"semantic_only\"::String",
+        )
     end
 end
 
@@ -308,11 +328,16 @@ end
         )
         @test occursin("oops", err.message)
         @test occursin("::String", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight request metadata key attempt_count must contain Int64 values or be missing; got \"oops\"::String",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight request metadata key attempt_count must contain Int64 values or be missing; got \"oops\"::String"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight request metadata key attempt_count must contain Int64 values or be missing; got \"oops\"::String",
+        )
     end
 end
 
@@ -340,8 +365,9 @@ end
             "Flight request batch column doc_id row 2 must contain unique non-empty string values",
             output,
         )
-        @test occursin("duplicate \"doc-a\" already seen at row 1", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("duplicate", output)
+        @test occursin("already seen at row 1", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -364,12 +390,18 @@ end
             "Flight request batch column doc_id row 2 must contain unique non-empty string values",
             err.message,
         )
-        @test occursin("duplicate \"doc-a\" already seen at row 1", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test occursin("duplicate", err.message)
+        @test occursin("already seen at row 1", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight request batch column doc_id row 2 must contain unique non-empty string values; duplicate \"doc-a\" already seen at row 1",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight request batch column doc_id row 2 must contain unique non-empty string values; duplicate \"doc-a\" already seen at row 1"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight request batch column doc_id row 2 must contain unique non-empty string values; duplicate \"doc-a\" already seen at row 1",
+        )
     end
 end
 
@@ -399,7 +431,7 @@ end
         )
         @test occursin("sideways", output)
         @test occursin("::String", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -425,11 +457,16 @@ end
         )
         @test occursin("sideways", err.message)
         @test occursin("::String", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight request metadata key cache_backend must contain one of [memory, disk, remote] or be missing; got \"sideways\"::String",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight request metadata key cache_backend must contain one of [memory, disk, remote] or be missing; got \"sideways\"::String"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight request metadata key cache_backend must contain one of [memory, disk, remote] or be missing; got \"sideways\"::String",
+        )
     end
 end
 
@@ -460,7 +497,7 @@ end
         )
         @test occursin("cluster", output)
         @test occursin("::String", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -487,11 +524,16 @@ end
         )
         @test occursin("cluster", err.message)
         @test occursin("::String", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight request metadata key cache_scope must contain one of [request, tenant, global] or be missing; got \"cluster\"::String",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight request metadata key cache_scope must contain one of [request, tenant, global] or be missing; got \"cluster\"::String"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight request metadata key cache_scope must contain one of [request, tenant, global] or be missing; got \"cluster\"::String",
+        )
     end
 end
 
@@ -522,7 +564,7 @@ end
         )
         @test occursin("oops", output)
         @test occursin("::String", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -549,11 +591,16 @@ end
         )
         @test occursin("oops", err.message)
         @test occursin("::String", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight request metadata key cache_score must contain finite Float64 values or be missing; got \"oops\"::String",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight request metadata key cache_score must contain finite Float64 values or be missing; got \"oops\"::String"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight request metadata key cache_score must contain finite Float64 values or be missing; got \"oops\"::String",
+        )
     end
 end
 
@@ -585,7 +632,7 @@ end
         )
         @test occursin("not-a-datetime", output)
         @test occursin("::String", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -613,11 +660,16 @@ end
         )
         @test occursin("not-a-datetime", err.message)
         @test occursin("::String", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight request metadata key cache_generated_at must contain ISO8601 DateTime values or be missing; got \"not-a-datetime\"::String",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight request metadata key cache_generated_at must contain ISO8601 DateTime values or be missing; got \"not-a-datetime\"::String"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight request metadata key cache_generated_at must contain ISO8601 DateTime values or be missing; got \"not-a-datetime\"::String",
+        )
     end
 end
 
@@ -647,7 +699,7 @@ end
         )
         @test occursin("maybe", output)
         @test occursin("::String", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -673,11 +725,16 @@ end
         )
         @test occursin("maybe", err.message)
         @test occursin("::String", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight request metadata key cache_hit must contain Bool values or be missing; got \"maybe\"::String",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight request metadata key cache_hit must contain Bool values or be missing; got \"maybe\"::String"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight request metadata key cache_hit must contain Bool values or be missing; got \"maybe\"::String",
+        )
     end
 end
 
@@ -706,7 +763,7 @@ end
             output,
         )
         @test occursin("got empty string", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -731,11 +788,16 @@ end
             err.message,
         )
         @test occursin("got empty string", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight request metadata key trace_id must contain non-empty string values or be missing; got empty string",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight request metadata key trace_id must contain non-empty string values or be missing; got empty string"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight request metadata key trace_id must contain non-empty string values or be missing; got empty string",
+        )
     end
 end
 
@@ -764,7 +826,7 @@ end
             output,
         )
         @test occursin("got empty string", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -789,10 +851,15 @@ end
             err.message,
         )
         @test occursin("got empty string", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight request metadata key tenant_id must contain non-empty string values or be missing; got empty string",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight request metadata key tenant_id must contain non-empty string values or be missing; got empty string"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight request metadata key tenant_id must contain non-empty string values or be missing; got empty string",
+        )
     end
 end

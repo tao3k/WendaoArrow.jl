@@ -1,6 +1,4 @@
-using Pkg
 using Dates
-using TOML
 
 const SPLIT_TEST_ROOT = @__DIR__
 const TEST_ROOT = normpath(joinpath(SPLIT_TEST_ROOT, ".."))
@@ -32,47 +30,6 @@ function grpcserver_roots(path::AbstractString)
         current = parent
     end
     return roots
-end
-
-function grpcclient_repo_candidates()
-    candidates = String[]
-    for root in grpcserver_roots(TEST_ROOT)
-        for candidate in (joinpath(root, ".data", "gRPCClient.jl"),)
-            isfile(joinpath(candidate, "Project.toml")) || continue
-            candidate ∉ candidates || continue
-            push!(candidates, candidate)
-        end
-    end
-    return candidates
-end
-
-function locate_grpcclient()
-    for candidate in grpcclient_repo_candidates()
-        return candidate
-    end
-    return nothing
-end
-
-function locate_grpcserver()
-    if haskey(ENV, "WENDAO_FLIGHT_GRPCSERVER_PATH")
-        candidate = abspath(ENV["WENDAO_FLIGHT_GRPCSERVER_PATH"])
-        isdir(candidate) ||
-            error("WENDAO_FLIGHT_GRPCSERVER_PATH does not exist: $candidate")
-        return candidate
-    end
-
-    grpcserver_source = locked_source("gRPCServer")
-    if haskey(grpcserver_source, "path")
-        candidate = normpath(joinpath(WENDAO_ROOT, String(grpcserver_source["path"])))
-        isdir(candidate) ||
-            error("WendaoArrow Project.toml gRPCServer path does not exist: $candidate")
-        return candidate
-    end
-
-    error(
-        "Could not locate gRPCServer.jl. " *
-        "Set WENDAO_FLIGHT_GRPCSERVER_PATH or declare a local path in [sources].gRPCServer.",
-    )
 end
 
 function locate_pyarrow_flight_python()
@@ -134,85 +91,14 @@ function pyarrow_flight_available(candidate::AbstractString)
     end
 end
 
-function maybe_local_arrow_checkout()
-    haskey(ENV, "WENDAO_ARROW_JULIA_PATH") || return nothing
-    candidate = abspath(ENV["WENDAO_ARROW_JULIA_PATH"])
-    isdir(candidate) || error("WENDAO_ARROW_JULIA_PATH does not exist: $candidate")
-    arrowtypes_root = joinpath(candidate, "src", "ArrowTypes")
-    isdir(arrowtypes_root) ||
-        error("WENDAO_ARROW_JULIA_PATH is missing src/ArrowTypes: $candidate")
-    return candidate, arrowtypes_root
-end
-
-function maybe_repo_local_arrow_checkout()
-    for root in grpcserver_roots(TEST_ROOT)
-        candidate = joinpath(root, ".data", "arrow-julia")
-        arrowtypes_root = joinpath(candidate, "src", "ArrowTypes")
-        isdir(candidate) && isdir(arrowtypes_root) && return candidate, arrowtypes_root
-    end
-    return nothing
-end
-
-function locked_source(name::AbstractString)
-    parsed = TOML.parsefile(joinpath(WENDAO_ROOT, "Project.toml"))
-    sources = get(parsed, "sources", Dict{String,Any}())
-    source = get(sources, String(name), nothing)
-    isnothing(source) && error("WendaoArrow Project.toml is missing [sources].$(name)")
-    return source
-end
-
-function locked_arrow_sources()
-    return locked_source("Arrow"), locked_source("ArrowTypes")
-end
-
-function package_spec_from_source(name::AbstractString, source::Dict{String,Any})
-    if haskey(source, "path")
-        return PackageSpec(
-            name = String(name),
-            path = normpath(joinpath(WENDAO_ROOT, String(source["path"]))),
-        )
-    end
-    return PackageSpec(
-        name = String(name),
-        url = String(source["url"]),
-        rev = String(source["rev"]),
-        subdir = haskey(source, "subdir") ? String(source["subdir"]) : nothing,
-    )
-end
-
-const TEMP_ENV = mktempdir()
-
-Pkg.activate(TEMP_ENV)
-Pkg.develop(PackageSpec(path = WENDAO_ROOT))
-local_arrow_checkout = maybe_local_arrow_checkout()
-isnothing(local_arrow_checkout) &&
-    (local_arrow_checkout = maybe_repo_local_arrow_checkout())
-if !isnothing(local_arrow_checkout)
-    arrow_root, arrowtypes_root = local_arrow_checkout
-    Pkg.develop(PackageSpec(path = arrow_root))
-    Pkg.develop(PackageSpec(path = arrowtypes_root))
-else
-    arrow_source, arrowtypes_source = locked_arrow_sources()
-    Pkg.add(package_spec_from_source("Arrow", arrow_source))
-    Pkg.add(package_spec_from_source("ArrowTypes", arrowtypes_source))
-end
-Pkg.develop(PackageSpec(path = locate_grpcserver()))
-local_grpcclient_checkout = locate_grpcclient()
-if !isnothing(local_grpcclient_checkout)
-    Pkg.develop(PackageSpec(path = local_grpcclient_checkout))
-else
-    Pkg.add("gRPCClient")
-end
-Pkg.add("Tables")
-Pkg.instantiate()
-
 using Test
-using Arrow
 using Sockets
 using Tables
 using WendaoArrow
 using gRPCServer
 using gRPCClient
+
+const Arrow = WendaoArrow.Arrow
 
 include(joinpath(WENDAO_ROOT, "examples", "support.jl"))
 
@@ -389,19 +275,43 @@ end
 
 function _start_flight_server(command_builder::Function; startup_attempts::Integer = 3)
     last_error = nothing
+    last_output = ""
     for attempt = 1:startup_attempts
         port = available_port()
-        process = run(command_builder(port); wait = false)
+        output_path = tempname()
+        output_io = open(output_path, "w")
+        process = run(
+            pipeline(command_builder(port); stdout = output_io, stderr = output_io);
+            wait = false,
+        )
+        close(output_io)
         try
             wait_for_port(WendaoArrow.DEFAULT_HOST, port, process)
             return port, process
         catch err
-            last_error = err
+            last_output = isfile(output_path) ? read(output_path, String) : ""
+            if isempty(strip(last_output))
+                last_error = err
+            else
+                message = sprint(showerror, err)
+                last_error = ErrorException(
+                    string(message, "\nFlight server output:\n", last_output),
+                )
+            end
             terminate_process(process)
             attempt == startup_attempts || sleep(0.25 * attempt)
         end
     end
-    rethrow(last_error)
+    last_error === nothing && error(
+        isempty(strip(last_output)) ?
+        "WendaoArrow Flight server failed to start without reporting an exception" :
+        string(
+            "WendaoArrow Flight server failed to start without reporting an exception",
+            "\nFlight server output:\n",
+            last_output,
+        ),
+    )
+    throw(last_error)
 end
 
 function flight_server_command(script_name::AbstractString, port::Integer)
@@ -1497,18 +1407,10 @@ function _collect_string_lists(values)
     return [String[item for item in value] for value in values]
 end
 
-function assert_list_roundtrip_columns(response_table, expected)
-    return assert_list_roundtrip_columns(
-        response_table,
-        expected;
-        response_mode = "list-roundtrip",
-    )
-end
-
 function assert_list_roundtrip_columns(
     response_table,
     expected;
-    response_mode::AbstractString,
+    response_mode::AbstractString = "list-roundtrip",
 )
     columns = Tables.columntable(response_table)
     @test collect(columns.request_id) == expected.request_id
@@ -1535,8 +1437,21 @@ function search_like_structural_route_headers()
     ]
 end
 
+function native_julia_request_headers_supported()
+    extension = Base.get_extension(Arrow, :ArrowFlightgRPCClientExt)
+    return !isnothing(extension) && isdefined(extension, Symbol("_header_lines"))
+end
+
 _grpc_request(req) = hasproperty(req, :request) ? getproperty(req, :request) : req
 _grpc_status(req) = getproperty(_grpc_request(req), :grpc_status)
+
+wrapped_argumenterror_text(message::AbstractString) =
+    "ArgumentError(" * repr(String(message)) * ")"
+
+matches_expected_invalid_argument_message(
+    message::AbstractString,
+    expected::AbstractString,
+) = message == expected || message == wrapped_argumenterror_text(expected)
 _grpc_message(req) = getproperty(_grpc_request(req), :grpc_message)
 
 function native_julia_doexchange_failure(

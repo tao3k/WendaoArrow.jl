@@ -1,9 +1,9 @@
 using Test
-using Dates
-using Arrow
 using Tables
 using WendaoArrow
 
+const Arrow = WendaoArrow.Arrow
+const DateTime = WendaoArrow.Dates.DateTime
 const VALID_SCHEMA_VERSION_METADATA =
     ["wendao.schema_version" => WendaoArrow.DEFAULT_SCHEMA_VERSION]
 

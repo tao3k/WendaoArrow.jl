@@ -1,7 +1,8 @@
-using Arrow
 using WendaoArrow
 using Tables
 using gRPCServer
+
+const Arrow = WendaoArrow.Arrow
 
 config = WendaoArrow.config_from_args(ARGS)
 

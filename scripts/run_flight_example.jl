@@ -1,9 +1,5 @@
-using Pkg
-
 const SCRIPT_ROOT = @__DIR__
 const WENDAO_ROOT = normpath(joinpath(SCRIPT_ROOT, ".."))
-const ARROW_ROOT = normpath(joinpath(WENDAO_ROOT, "..", "arrow-julia"))
-const ARROWTYPES_ROOT = joinpath(ARROW_ROOT, "src", "ArrowTypes")
 
 function maybe_git_root(path::AbstractString)
     try
@@ -28,20 +24,6 @@ function flight_roots(path::AbstractString)
         current = parent
     end
     return roots
-end
-
-function grpcserver_depot_candidates()
-    candidates = String[]
-    for depot in DEPOT_PATH
-        packages_root = joinpath(depot, "packages", "gRPCServer")
-        isdir(packages_root) || continue
-        for entry in sort(readdir(packages_root))
-            candidate = joinpath(packages_root, entry)
-            isfile(joinpath(candidate, "Project.toml")) || continue
-            push!(candidates, candidate)
-        end
-    end
-    return candidates
 end
 
 function path_within_root(path::AbstractString, root::AbstractString)
@@ -69,53 +51,10 @@ function resolve_example_target(path_arg::AbstractString)
     return candidate
 end
 
-function maybe_locate_grpcserver()
-    if haskey(ENV, "WENDAO_FLIGHT_GRPCSERVER_PATH")
-        candidate = abspath(ENV["WENDAO_FLIGHT_GRPCSERVER_PATH"])
-        isdir(candidate) ||
-            error("WENDAO_FLIGHT_GRPCSERVER_PATH does not exist: $candidate")
-        return candidate
-    end
-    for root in flight_roots(SCRIPT_ROOT)
-        for candidate in (
-            joinpath(root, ".data", "gRPCServer.jl"),
-            joinpath(root, ".cache", "vendor", "gRPCServer.jl"),
-        )
-            isdir(candidate) && return candidate
-        end
-    end
-    for candidate in grpcserver_depot_candidates()
-        return candidate
-    end
-    return nothing
-end
-
-function activate_flight_env()
-    temp_env = mktempdir()
-    Pkg.activate(temp_env)
-    Pkg.develop(PackageSpec(path = WENDAO_ROOT))
-    Pkg.develop(PackageSpec(path = ARROW_ROOT))
-    Pkg.develop(PackageSpec(path = ARROWTYPES_ROOT))
-    grpcserver = maybe_locate_grpcserver()
-    if !isnothing(grpcserver)
-        Pkg.develop(PackageSpec(path = grpcserver))
-    else
-        error(
-            "Could not locate gRPCServer.jl. " *
-            "Set WENDAO_FLIGHT_GRPCSERVER_PATH, add .cache/vendor/gRPCServer.jl " *
-            "under the repository root, or install gRPCServer into the active Julia depot.",
-        )
-    end
-    Pkg.add("Tables")
-    Pkg.instantiate()
-    return temp_env
-end
-
 function main(args::Vector{String})
     isempty(args) && error("expected a relative Flight example path")
     target = resolve_example_target(args[1])
 
-    activate_flight_env()
     empty!(ARGS)
     append!(ARGS, args[2:end])
     return include(target)

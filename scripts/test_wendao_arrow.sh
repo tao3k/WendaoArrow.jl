@@ -3,4 +3,5 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-exec direnv exec . julia --project="$ROOT" -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+exec "${JULIA:-julia}" --project="$ROOT" \
+  -e 'using Pkg; Pkg.instantiate(); Pkg.test(; coverage=false)'

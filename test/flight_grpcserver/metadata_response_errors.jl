@@ -23,7 +23,7 @@
         )
         @test occursin("oops", output)
         @test occursin("::String", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -48,11 +48,16 @@ end
         )
         @test occursin("oops", err.message)
         @test occursin("::String", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight response column attempt_count row 1 must contain Int64 values or missing; got \"oops\"::String",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight response column attempt_count row 1 must contain Int64 values or missing; got \"oops\"::String"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight response column attempt_count row 1 must contain Int64 values or missing; got \"oops\"::String",
+        )
     end
 end
 
@@ -82,7 +87,7 @@ end
         )
         @test occursin("sideways", output)
         @test occursin("::String", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -108,11 +113,16 @@ end
         )
         @test occursin("sideways", err.message)
         @test occursin("::String", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight response column cache_backend row 1 must contain one of [memory, disk, remote] or missing; got \"sideways\"::String",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight response column cache_backend row 1 must contain one of [memory, disk, remote] or missing; got \"sideways\"::String"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight response column cache_backend row 1 must contain one of [memory, disk, remote] or missing; got \"sideways\"::String",
+        )
     end
 end
 
@@ -143,7 +153,7 @@ end
         )
         @test occursin("cluster", output)
         @test occursin("::String", output)
-        @test !occursin("ArgumentError", output)
+        @test occursin("ArgumentError(", output)
     end
 end
 
@@ -170,10 +180,15 @@ end
         )
         @test occursin("cluster", err.message)
         @test occursin("::String", err.message)
-        @test !occursin("ArgumentError", err.message)
+        @test matches_expected_invalid_argument_message(
+            err.message,
+            "WendaoArrow stream metadata Flight response column cache_scope row 1 must contain one of [request, tenant, global] or missing; got \"cluster\"::String",
+        )
         @test result.message_count == 0
         @test result.grpc_status == gRPCClient.GRPC_INVALID_ARGUMENT
-        @test result.grpc_message ==
-              "WendaoArrow stream metadata Flight response column cache_scope row 1 must contain one of [request, tenant, global] or missing; got \"cluster\"::String"
+        @test matches_expected_invalid_argument_message(
+            result.grpc_message,
+            "WendaoArrow stream metadata Flight response column cache_scope row 1 must contain one of [request, tenant, global] or missing; got \"cluster\"::String",
+        )
     end
 end

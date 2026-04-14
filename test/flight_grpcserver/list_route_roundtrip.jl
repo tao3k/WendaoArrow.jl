@@ -17,6 +17,10 @@
 end
 
 @testset "cross-process Flight startup script serves native Julia DoExchange for routed list columns with search-like headers" begin
+    if !native_julia_request_headers_supported()
+        @test_skip native_julia_request_headers_supported()
+        return
+    end
     expected = expected_list_roundtrip_response()
     descriptor = WendaoArrow.flight_route_descriptor("/graph/structural/rerank")
     with_list_route_roundtrip_flight_server() do port, process

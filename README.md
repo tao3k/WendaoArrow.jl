@@ -8,9 +8,9 @@ ships package-local `Arrow.Flight.Service` composition plus an optional
 The first analyzer package now lives alongside it at `.data/WendaoAnalyzer`.
 
 In this workspace, `Arrow` stays pinned to the upstream `arrow-julia` main
-revision, while `ArrowTypes` resolves from the sibling checkout under
-`.data/arrow-julia/src/ArrowTypes` to avoid local Julia `Pkg` subdirectory
-resolution failures during Flight development.
+revision through `Project.toml` source locks, so package bootstrap and CI use
+the same `Arrow` / `ArrowTypes` transport revision without requiring a sibling
+checkout.
 
 ## What This Package Owns
 
@@ -96,11 +96,9 @@ Or override with flags:
 .data/WendaoArrow.jl/scripts/run_stream_scoring_flight_server.sh --host 127.0.0.1 --port 18815
 ```
 
-The launcher scripts prefer a vendored `.cache/vendor/gRPCServer.jl` checkout
-when present. If no vendored checkout exists, they next reuse an installed
-`gRPCServer` package from the active Julia depot. Set
-`WENDAO_FLIGHT_GRPCSERVER_PATH` to an explicit local `gRPCServer.jl` checkout
-when you need to override both defaults.
+The launcher scripts now run against the root `WendaoArrow.jl` project. That
+keeps the source locks, example imports, and local CI bootstrap on one
+`Project.toml`.
 
 Start an optional Flight listener from Julia when `gRPCServer` is present:
 
@@ -303,9 +301,11 @@ Current cross-process status is narrower than the package-local matrix:
 
 - `test/runtests.jl` does not currently include `test/flight_grpcserver.jl`;
   run the cross-process matrix directly when debugging transport behavior
-- `test/flight_grpcserver/support.jl` now auto-discovers the repo-local
-  `.data/arrow-julia` checkout so the harness can develop both `Arrow` and
-  `ArrowTypes` without relying on an extra environment variable
+- `test/flight_grpcserver/support.jl` now instantiates the active project
+  instead of patching a temporary environment; use
+  `julia --project=.data/WendaoArrow.jl -e 'using Pkg; Pkg.test(; test_args=["flight_grpcserver"])'`
+  when running the cross-process matrix directly so the root project and
+  `test` target provide the required transport dependencies
 - the harness now accepts either
   `.cache/arrow-julia-flight-pyenv/bin/python` or
   `.cache/arrow-julia-flight-pyenv/.venv/bin/python` for the local

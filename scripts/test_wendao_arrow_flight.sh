@@ -2,7 +2,6 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-REPO_ROOT="$(cd "$ROOT/../.." && pwd)"
 
-exec direnv exec "$REPO_ROOT" julia --project="$ROOT" \
-  "$ROOT/test/flight_grpcserver.jl"
+exec "${JULIA:-julia}" --project="$ROOT" -e \
+  'using Pkg; Pkg.instantiate(); Pkg.test(; coverage=false, test_args=["flight_grpcserver"])'

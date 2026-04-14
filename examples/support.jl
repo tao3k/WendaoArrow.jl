@@ -1,9 +1,10 @@
 module WendaoArrowExampleSupport
 
-using Arrow
 using Dates
 using Tables
 using WendaoArrow
+
+const Arrow = WendaoArrow.Arrow
 
 export build_stream_metadata_example_processor
 export build_parser_summary_like_example_processor

@@ -73,7 +73,7 @@ export serve_stream_flight
 function flight_server(args...; kwargs...)
     throw(
         ArgumentError(
-            "WendaoArrow.flight_server requires the optional gRPCServer weak dependency in the active Julia environment",
+            "WendaoArrow.flight_server requires gRPCServer to be loaded in the active Julia environment",
         ),
     )
 end
@@ -81,7 +81,7 @@ end
 function serve_flight(args...; kwargs...)
     throw(
         ArgumentError(
-            "WendaoArrow.serve_flight requires the optional gRPCServer weak dependency in the active Julia environment",
+            "WendaoArrow.serve_flight requires gRPCServer to be loaded in the active Julia environment",
         ),
     )
 end
@@ -89,7 +89,7 @@ end
 function serve_stream_flight(args...; kwargs...)
     throw(
         ArgumentError(
-            "WendaoArrow.serve_stream_flight requires the optional gRPCServer weak dependency in the active Julia environment",
+            "WendaoArrow.serve_stream_flight requires gRPCServer to be loaded in the active Julia environment",
         ),
     )
 end
