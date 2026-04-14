@@ -1,4 +1,7 @@
-const LARGE_RESPONSE_DOC_ID_BYTES = 8 * 1024 * 1024
+# Keep this well below the upstream Arrow Flight default transport ceiling.
+# arrow-julia owns the larger-message transport proofs; WendaoArrow only needs
+# one bounded product-contract check that a materially large doc_id survives.
+const LARGE_RESPONSE_DOC_ID_BYTES = 1 * 1024 * 1024
 
 function build_stream_scoring_example_processor(;
     request_subject,

@@ -23,11 +23,7 @@ end
 @testset "WendaoArrow product helper serves large scoring Flight responses" begin
     with_large_response_flight_server() do port, process
         @test Base.process_running(process)
-        response = product_helper_doexchange(
-            port;
-            max_send_message_length = WendaoArrow.DEFAULT_GATEWAY_FLIGHT_MAX_MESSAGE_LENGTH,
-            max_recieve_message_length = WendaoArrow.DEFAULT_GATEWAY_FLIGHT_MAX_MESSAGE_LENGTH,
-        )
+        response = product_helper_doexchange(port)
         @test length(response.doc_id) == 1
         @test length(only(response.doc_id)) ==
               WendaoArrowExampleSupport.LARGE_RESPONSE_DOC_ID_BYTES
