@@ -65,17 +65,25 @@ function flight_exchange_table(
     convert::Bool = true,
     include_app_metadata::Bool = false,
 )
-    req, response = Arrow.Flight.doexchange(
-        client,
+    req, request_stream, response = Arrow.Flight.doexchange(client; headers = request.headers)
+    producer = @async Arrow.Flight.putflightdata!(
+        request_stream,
         request.source;
+        close = true,
         descriptor = request.descriptor,
-        headers = request.headers,
     )
-    result = Arrow.Flight.table(
-        response;
-        convert = convert,
-        include_app_metadata = include_app_metadata,
-    )
+    result = try
+        Arrow.Flight.table(
+            response;
+            convert = convert,
+            include_app_metadata = include_app_metadata,
+        )
+    catch
+        wait(producer)
+        _await_flight_request(req)
+        rethrow()
+    end
+    wait(producer)
     _await_flight_request(req)
     return result
 end

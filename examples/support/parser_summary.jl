@@ -1,4 +1,8 @@
-const PARSER_SUMMARY_LIKE_ROW_COUNT = 1075
+# Keep one bounded representative cycle across the six parser item shapes
+# without turning WendaoArrow's product-contract tests into transport-scale
+# response proofs. Arrow Flight and gRPC transport suites own the larger
+# payload coverage.
+const PARSER_SUMMARY_LIKE_ROW_COUNT = 24
 
 function build_parser_summary_like_example_processor(;
     request_subject,

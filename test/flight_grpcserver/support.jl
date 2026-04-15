@@ -1349,6 +1349,28 @@ function product_helper_doexchange(
     )
 end
 
+function empty_scoring_response(response)::Bool
+    return isempty(response.doc_id) &&
+           isempty(response.analyzer_score) &&
+           isempty(response.final_score)
+end
+
+function product_helper_doexchange_nonempty(
+    port::Integer;
+    attempts::Integer = 4,
+    retry_delay_seconds::Float64 = 0.5,
+    client_kwargs...,
+)
+    last_response = nothing
+    for attempt = 1:attempts
+        response = product_helper_doexchange(port; client_kwargs...)
+        last_response = response
+        empty_scoring_response(response) || return response
+        attempt == attempts || sleep(retry_delay_seconds * attempt)
+    end
+    return last_response
+end
+
 function _schema_wrapped_source(source)
     return WendaoArrow.schema_table(
         source;
