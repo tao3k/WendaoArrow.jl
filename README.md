@@ -133,6 +133,13 @@ server = WendaoArrow.serve_stream_flight(
 WendaoArrow.Arrow.Flight.stop!(server; force = true)
 ```
 
+The packaged listener wrappers now keep three runtime bounds explicit:
+`max_active_requests` for server-wide admission control plus
+`request_capacity` / `response_capacity` for per-stream buffering.
+Those wrappers now assume the loaded `Arrow.Flight` implementation already
+accepts `max_active_requests`; this package no longer carries a compatibility
+branch for pre-budget Arrow listener revisions.
+
 Config precedence is `defaults < TOML < flags`.
 
 ## Package Surface
@@ -169,7 +176,8 @@ WendaoArrow exposes:
   Flight route
 - `flight_server(service)` for packaged `PureHTTP2` listener composition
 - `serve_flight(processor)` and `serve_stream_flight(processor)` for packaged
-  Flight listeners
+  Flight listeners with explicit `max_active_requests`,
+  `request_capacity`, and `response_capacity` bounds
 - `flight_listener_backend_capabilities(...)` and
   `flight_listener_backend_supported(...)` for the packaged listener backend
   contract, delegated to the shared upstream `Arrow.Flight` backend profile
