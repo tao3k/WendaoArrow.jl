@@ -164,16 +164,17 @@ WendaoArrow exposes:
   `x-wendao-schema-version` request-header construction
 - `flight_exchange_request(source; descriptor = ..., headers = ...)` for one
   prepared `DoExchange` request wrapper
-- `flight_exchange_table(...)` for request-wrapper-driven local or client-side
+- `flight_exchange_table(...)` for request-wrapper-driven in-process
   `DoExchange` response decoding
 - `build_flight_service(processor)` for table-first local Flight `DoExchange`
   services
 - `build_stream_flight_service(processor)` for stream-first local Flight
   `DoExchange` services
-- `gateway_flight_client()` for the live Wendao gateway Flight client surface
-- `gateway_repo_search(...)` for the runtime-owned repo-search Flight route
-- `gateway_knowledge_search(...)` for the runtime-owned knowledge-search
-  Flight route
+- `gateway_flight_descriptor(route)` for runtime-owned gateway route
+  normalization into a Flight path descriptor
+- `gateway_repo_search_headers(...)` and
+  `gateway_knowledge_search_headers(...)` for the runtime-owned gateway header
+  contract
 - `flight_server(service)` for packaged `PureHTTP2` listener composition
 - `serve_flight(processor)` and `serve_stream_flight(processor)` for packaged
   Flight listeners with explicit `max_active_requests`,
@@ -201,9 +202,10 @@ that root is expected to come from the calling lane's own config or descriptor
 surface rather than from package-local numbered files. The canonical checked-in
 example servers remain under `examples/` and `scripts/`.
 
-When a downstream package is ready to actually emit a request, it should
-prefer `flight_exchange_request(...)` and `flight_exchange_table(...)` instead
-of manually threading source, descriptor, and headers at each call site.
+When a downstream package is ready to prepare an in-process request against a
+local `Arrow.Flight.Service`, it should prefer `flight_exchange_request(...)`
+and `flight_exchange_table(...)` instead of manually threading source,
+descriptor, and headers at each call site.
 
 The packaged `build_flight_service(...)` and `build_stream_flight_service(...)`
 surfaces now also accept `expected_schema_version = ...`, so draft downstream
@@ -244,11 +246,10 @@ WendaoArrow no longer owns a separate runtime carrier for response
 The metadata overlay path now rides on upstream `Arrow.withmetadata(...)`
 instead of package-local wrapper types.
 
-The packaged gateway client surface is explicit and separate from the local
-`v1` scoring-service contract. Gateway search helpers default to
-`x-wendao-schema-version = v2`, target the live runtime-owned routes
-`/search/repos/main` and `/search/knowledge`, and use upstream
-`Arrow.Flight.getflightinfo(...) + doget(...) + table(...)` under the hood.
+The live Rust gateway benchmark and packaged listener stress lane now run
+through Python clients. `WendaoArrow.jl` no longer owns a Julia-side Flight
+client compatibility surface; this package stops at server/runtime helpers
+plus shared gateway descriptor/header normalization.
 
 ## Contract Notes
 
@@ -278,15 +279,33 @@ Julia package-local validation:
 .data/WendaoArrow/scripts/test_wendao_arrow.sh
 ```
 
-Live gateway benchmark:
+Live Rust gateway benchmark:
 
 ```bash
-direnv exec . julia --project=.data/WendaoArrow .data/WendaoArrow/scripts/benchmark_gateway_flight.jl --host 127.0.0.1 --port 9517 --query flight --limit 5 --samples 10
+direnv exec . uv run python .data/WendaoArrow.jl/scripts/benchmark_gateway_flight.py --host 127.0.0.1 --port 9517 --query flight --limit 5 --samples 10 --route both
 ```
 
+Packaged listener stress benchmark:
+
+```bash
+direnv exec . julia --project=.data/WendaoArrow.jl .data/WendaoArrow.jl/scripts/run_packaged_flight_benchmark_server.jl --host 127.0.0.1 --port 18815 --response-mode large_response --large-doc-bytes 2097152 --max-active-requests 32
+```
+
+In another shell, drive that packaged listener with the Python Flight client:
+
+```bash
+direnv exec . uv run python .data/WendaoArrow.jl/scripts/benchmark_packaged_flight_listener.py --host 127.0.0.1 --port 18815 --workers 8 --samples 20 --request-rows 32
+```
+
+That split package-owned stress setup keeps WendaoArrow on server-only Julia
+dependencies while the benchmark client runs through `pyarrow.flight`. The
+Python side reports packaged listener `DoExchange` latency and throughput
+directly, including `p95` / `p99`, `ops_per_sec`, and
+`throughput_mib_per_sec`.
+
 The package-local regression matrix is split under `test/runtests/` into
-focused support, contract-helper, scoring/metadata-contract, local-Flight, and
-config files.
+focused support, contract-helper, scoring/metadata-contract, local-Flight,
+packaged-benchmark-server, and config files.
 
 Current Flight verification covers:
 
@@ -301,6 +320,8 @@ Current Flight verification covers:
 - schema metadata and field metadata preservation through packaged local Flight
   response paths
 - response `app_metadata` preservation through packaged local `DoExchange`
+- packaged benchmark-server argument coverage for the package-owned
+  `PureHTTP2` listener stress harness
 
 The broader live-network interop and `pyarrow.flight` listener proofs now live
 upstream in `arrow-julia`'s `PureHTTP2` Flight suite, while WendaoArrow keeps

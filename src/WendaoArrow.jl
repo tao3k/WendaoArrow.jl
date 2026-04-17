@@ -53,12 +53,8 @@ export flight_exchange_request
 export flight_exchange_table
 export flight_route_descriptor
 export flight_schema_headers
-export gateway_flight_client
 export gateway_flight_descriptor
-export gateway_flight_table
-export gateway_knowledge_search
 export gateway_knowledge_search_headers
-export gateway_repo_search
 export gateway_repo_search_headers
 export load_config
 export normalize_metadata_values
