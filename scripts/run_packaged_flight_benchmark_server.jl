@@ -11,7 +11,6 @@ Base.@kwdef struct PackagedFlightBenchmarkServerConfig
     response_mode::Symbol = :echo
     large_doc_bytes::Int = 2 * 1024 * 1024
     processing_delay_ms::Int = 0
-    max_active_requests::Int = max(Base.Threads.nthreads() * 8, 32)
     request_capacity::Int = 16
     response_capacity::Int = 16
 end
@@ -24,7 +23,6 @@ function parse_server_args(args::Vector{String})
     response_mode = :echo
     large_doc_bytes = 2 * 1024 * 1024
     processing_delay_ms = 0
-    max_active_requests = max(Base.Threads.nthreads() * 8, 32)
     request_capacity = 16
     response_capacity = 16
 
@@ -55,8 +53,6 @@ function parse_server_args(args::Vector{String})
             large_doc_bytes = parse(Int, split(argument, "=", limit = 2)[2])
         elseif startswith(argument, "--processing-delay-ms=")
             processing_delay_ms = parse(Int, split(argument, "=", limit = 2)[2])
-        elseif startswith(argument, "--max-active-requests=")
-            max_active_requests = parse(Int, split(argument, "=", limit = 2)[2])
         elseif startswith(argument, "--request-capacity=")
             request_capacity = parse(Int, split(argument, "=", limit = 2)[2])
         elseif startswith(argument, "--response-capacity=")
@@ -65,7 +61,6 @@ function parse_server_args(args::Vector{String})
             "--response-mode",
             "--large-doc-bytes",
             "--processing-delay-ms",
-            "--max-active-requests",
             "--request-capacity",
             "--response-capacity",
         )
@@ -78,8 +73,6 @@ function parse_server_args(args::Vector{String})
                 large_doc_bytes = parse(Int, value)
             elseif argument == "--processing-delay-ms"
                 processing_delay_ms = parse(Int, value)
-            elseif argument == "--max-active-requests"
-                max_active_requests = parse(Int, value)
             elseif argument == "--request-capacity"
                 request_capacity = parse(Int, value)
             else
@@ -104,9 +97,6 @@ function parse_server_args(args::Vector{String})
     processing_delay_ms >= 0 || throw(
         ArgumentError("benchmark server processing_delay_ms must be zero or greater"),
     )
-    max_active_requests > 0 || throw(
-        ArgumentError("benchmark server max_active_requests must be greater than zero"),
-    )
     request_capacity > 0 || throw(
         ArgumentError("benchmark server request_capacity must be greater than zero"),
     )
@@ -125,7 +115,6 @@ function parse_server_args(args::Vector{String})
         response_mode = response_mode,
         large_doc_bytes = large_doc_bytes,
         processing_delay_ms = processing_delay_ms,
-        max_active_requests = max_active_requests,
         request_capacity = request_capacity,
         response_capacity = response_capacity,
     )
@@ -172,7 +161,6 @@ function start_server(config::PackagedFlightBenchmarkServerConfig)
         host = config.host,
         port = config.port,
         block = false,
-        max_active_requests = config.max_active_requests,
         request_capacity = config.request_capacity,
         response_capacity = config.response_capacity,
     )

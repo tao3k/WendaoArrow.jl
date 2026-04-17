@@ -91,7 +91,6 @@ function flight_server(
     service::Arrow.Flight.Service;
     host::AbstractString = DEFAULT_HOST,
     port::Integer = DEFAULT_FLIGHT_PORT,
-    max_active_requests::Integer = max(Base.Threads.nthreads() * 8, 32),
     request_capacity::Integer = 16,
     response_capacity::Integer = 16,
     backend::Symbol = :purehttp2,
@@ -102,7 +101,6 @@ function flight_server(
         service;
         host = host,
         port = port,
-        max_active_requests = max_active_requests,
         request_capacity = request_capacity,
         response_capacity = response_capacity,
     )
@@ -115,7 +113,6 @@ function serve_flight(
     descriptor = flight_descriptor(),
     include_request_app_metadata::Bool = false,
     block::Bool = true,
-    max_active_requests::Integer = max(Base.Threads.nthreads() * 8, 32),
     request_capacity::Integer = 16,
     response_capacity::Integer = 16,
     backend::Symbol = :purehttp2,
@@ -130,7 +127,6 @@ function serve_flight(
         service;
         host = host,
         port = port,
-        max_active_requests = max_active_requests,
         request_capacity = request_capacity,
         response_capacity = response_capacity,
         backend = backend,
@@ -145,7 +141,6 @@ function serve_stream_flight(
     descriptor = flight_descriptor(),
     include_request_app_metadata::Bool = false,
     block::Bool = true,
-    max_active_requests::Integer = max(Base.Threads.nthreads() * 8, 32),
     request_capacity::Integer = 16,
     response_capacity::Integer = 16,
     backend::Symbol = :purehttp2,
@@ -160,7 +155,6 @@ function serve_stream_flight(
         service;
         host = host,
         port = port,
-        max_active_requests = max_active_requests,
         request_capacity = request_capacity,
         response_capacity = response_capacity,
         backend = backend,

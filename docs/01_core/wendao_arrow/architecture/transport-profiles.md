@@ -48,16 +48,10 @@ The package exposes:
   `flight_listener_backend_supported(...)` for the packaged network-listener
   backend contract, delegated to upstream `Arrow.Flight`
 
-The packaged listener wrappers keep three runtime bounds explicit:
+The packaged listener wrappers keep two runtime bounds explicit:
 
-- `max_active_requests` for server-wide admission control
 - `request_capacity` for request-stream buffering
 - `response_capacity` for response-stream buffering
-
-WendaoArrow now assumes the loaded upstream `Arrow.Flight` surface already
-supports the `max_active_requests` listener keyword. The package no longer
-keeps a compatibility branch for older Arrow revisions that only accepted the
-two per-stream channel capacities.
 
 Current response encoding treats the incoming `FlightDescriptor` as a routing
 input, not as a response echo contract. Outbound `FlightData` preserves

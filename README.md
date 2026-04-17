@@ -133,12 +133,9 @@ server = WendaoArrow.serve_stream_flight(
 WendaoArrow.Arrow.Flight.stop!(server; force = true)
 ```
 
-The packaged listener wrappers now keep three runtime bounds explicit:
-`max_active_requests` for server-wide admission control plus
-`request_capacity` / `response_capacity` for per-stream buffering.
-Those wrappers now assume the loaded `Arrow.Flight` implementation already
-accepts `max_active_requests`; this package no longer carries a compatibility
-branch for pre-budget Arrow listener revisions.
+The packaged listener wrappers keep per-stream buffering explicit through
+`request_capacity` and `response_capacity`, matching the current upstream
+`Arrow.Flight` listener surface.
 
 Config precedence is `defaults < TOML < flags`.
 
@@ -177,8 +174,8 @@ WendaoArrow exposes:
   contract
 - `flight_server(service)` for packaged `PureHTTP2` listener composition
 - `serve_flight(processor)` and `serve_stream_flight(processor)` for packaged
-  Flight listeners with explicit `max_active_requests`,
-  `request_capacity`, and `response_capacity` bounds
+  Flight listeners with explicit `request_capacity` and
+  `response_capacity` bounds
 - `flight_listener_backend_capabilities(...)` and
   `flight_listener_backend_supported(...)` for the packaged listener backend
   contract, delegated to the shared upstream `Arrow.Flight` backend profile
@@ -288,7 +285,7 @@ direnv exec . uv run python .data/WendaoArrow.jl/scripts/benchmark_gateway_fligh
 Packaged listener stress benchmark:
 
 ```bash
-direnv exec . julia --project=.data/WendaoArrow.jl .data/WendaoArrow.jl/scripts/run_packaged_flight_benchmark_server.jl --host 127.0.0.1 --port 18815 --response-mode large_response --large-doc-bytes 2097152 --max-active-requests 32
+direnv exec . julia --project=.data/WendaoArrow.jl .data/WendaoArrow.jl/scripts/run_packaged_flight_benchmark_server.jl --host 127.0.0.1 --port 18815 --response-mode large_response --large-doc-bytes 2097152
 ```
 
 In another shell, drive that packaged listener with the Python Flight client:
@@ -335,10 +332,6 @@ relying on unbounded queueing:
 
 - set `JULIA_NUM_THREADS` to the compute capacity actually reserved for the
   Julia worker process
-- size `max_active_requests` to the amount of concurrent work the process can
-  finish without thrashing; the packaged default is
-  `max(Base.Threads.nthreads() * 8, 32)`, but production lanes should tighten
-  that bound when each request performs heavier analysis
 - keep `request_capacity` and `response_capacity` finite so bursts from the
   Rust gateway turn into bounded backpressure rather than unbounded memory
   growth
