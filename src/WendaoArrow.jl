@@ -17,6 +17,7 @@ include("codec.jl")
 include("ranking_strategy.jl")
 include("contracts.jl")
 include("flight.jl")
+include("listener_backend.jl")
 include("gateway_flight.jl")
 
 export DEFAULT_HOST
@@ -44,22 +45,21 @@ export coerce_optional_float64
 export coerce_optional_int64
 export config_from_args
 export coerce_string
+export flight_listener_backend_capabilities
+export flight_listener_backend_supported
 export flight_server
 export flight_descriptor
 export flight_exchange_request
 export flight_exchange_table
 export flight_route_descriptor
 export flight_schema_headers
-export gateway_flight_client
 export gateway_flight_descriptor
-export gateway_flight_table
-export gateway_knowledge_search
 export gateway_knowledge_search_headers
-export gateway_repo_search
 export gateway_repo_search_headers
 export load_config
 export normalize_metadata_values
 export normalize_scoring_response
+export require_flight_listener_backend
 export require_columns
 export require_column_lengths
 export require_schema_version
@@ -70,28 +70,111 @@ export schema_table
 export serve_flight
 export serve_stream_flight
 
-function flight_server(args...; kwargs...)
+function _wait_for_flight_server(server; block::Bool)
+    if block
+        accept_task = getfield(server, :accept_task)
+        isnothing(accept_task) || wait(accept_task)
+    end
+    return server
+end
+
+function _require_arrow_purehttp2_listener(subject::AbstractString)
+    isdefined(Arrow.Flight, :purehttp2_flight_server) && return
     throw(
         ArgumentError(
-            "WendaoArrow.flight_server requires gRPCServer to be loaded in the active Julia environment",
+            "$(subject) requires an Arrow.jl revision that provides Arrow.Flight.purehttp2_flight_server(...)",
         ),
     )
 end
 
-function serve_flight(args...; kwargs...)
-    throw(
-        ArgumentError(
-            "WendaoArrow.serve_flight requires gRPCServer to be loaded in the active Julia environment",
-        ),
+function _flight_listener_constructor(backend::Symbol, subject::AbstractString)
+    if backend == :purehttp2
+        _require_arrow_purehttp2_listener(subject)
+        return getfield(Arrow.Flight, :purehttp2_flight_server)
+    end
+
+    throw(ArgumentError("$(subject) does not provide a listener constructor for backend :$(backend)"))
+end
+
+function flight_server(
+    service::Arrow.Flight.Service;
+    host::AbstractString = DEFAULT_HOST,
+    port::Integer = DEFAULT_FLIGHT_PORT,
+    max_active_requests::Integer = max(Threads.nthreads() * 8, 32),
+    request_capacity::Integer = 16,
+    response_capacity::Integer = 16,
+    backend::Symbol = :purehttp2,
+)
+    require_flight_listener_backend(backend; subject = "WendaoArrow.flight_server")
+    constructor = _flight_listener_constructor(backend, "WendaoArrow.flight_server")
+    return constructor(
+        service;
+        host = host,
+        port = port,
+        max_active_requests = max_active_requests,
+        request_capacity = request_capacity,
+        response_capacity = response_capacity,
     )
 end
 
-function serve_stream_flight(args...; kwargs...)
-    throw(
-        ArgumentError(
-            "WendaoArrow.serve_stream_flight requires gRPCServer to be loaded in the active Julia environment",
-        ),
+function serve_flight(
+    processor::Function;
+    host::AbstractString = DEFAULT_HOST,
+    port::Integer = DEFAULT_FLIGHT_PORT,
+    descriptor = flight_descriptor(),
+    include_request_app_metadata::Bool = false,
+    block::Bool = true,
+    max_active_requests::Integer = max(Threads.nthreads() * 8, 32),
+    request_capacity::Integer = 16,
+    response_capacity::Integer = 16,
+    backend::Symbol = :purehttp2,
+)
+    require_flight_listener_backend(backend; subject = "WendaoArrow.serve_flight")
+    service = build_flight_service(
+        processor;
+        descriptor = descriptor,
+        include_request_app_metadata = include_request_app_metadata,
     )
+    server = flight_server(
+        service;
+        host = host,
+        port = port,
+        max_active_requests = max_active_requests,
+        request_capacity = request_capacity,
+        response_capacity = response_capacity,
+        backend = backend,
+    )
+    return _wait_for_flight_server(server; block = block)
+end
+
+function serve_stream_flight(
+    processor::Function;
+    host::AbstractString = DEFAULT_HOST,
+    port::Integer = DEFAULT_FLIGHT_PORT,
+    descriptor = flight_descriptor(),
+    include_request_app_metadata::Bool = false,
+    block::Bool = true,
+    max_active_requests::Integer = max(Threads.nthreads() * 8, 32),
+    request_capacity::Integer = 16,
+    response_capacity::Integer = 16,
+    backend::Symbol = :purehttp2,
+)
+    require_flight_listener_backend(backend; subject = "WendaoArrow.serve_stream_flight")
+    service = build_stream_flight_service(
+        processor;
+        descriptor = descriptor,
+        include_request_app_metadata = include_request_app_metadata,
+    )
+    server = flight_server(
+        service;
+        host = host,
+        port = port,
+        max_active_requests = max_active_requests,
+        request_capacity = request_capacity,
+        response_capacity = response_capacity,
+        backend = backend,
+    )
+    return _wait_for_flight_server(server; block = block)
 end
 
 end

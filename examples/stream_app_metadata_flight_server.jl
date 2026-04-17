@@ -1,6 +1,5 @@
 using WendaoArrow
 using Tables
-using gRPCServer
 
 const Arrow = WendaoArrow.Arrow
 

@@ -14,8 +14,8 @@
 - land package-local `DoExchange` Flight service seams
 - keep server-side Flight response envelopes aligned with descriptor-free
   standard client expectations
-- land an optional `gRPCServer`-backed network listener surface without making
-  it a default dependency of the base package runtime
+- land a package-owned `PureHTTP2` network listener surface without re-opening
+  a separate server package dependency
 
 ## Phase 2: Operational Hardening
 
@@ -56,9 +56,6 @@
   `cache_backend`, `cache_scope`, `ranking_strategy`, and `retrieval_mode`
 - preserve explicit remote diagnostics for scoring-response normalization
   failures instead of collapsing them into generic processor failures
-- keep the cross-process Flight regression matrix split into focused
-  `test/flight_grpcserver/*` files so metadata and scoring proofs can evolve
-  without one monolithic test file
 - keep runtime-generated helper scripts out of the package git surface so only
   stable human-owned examples remain under `examples/` and `scripts/`, while
   disposable launch artifacts stay cache-owned under `PRJ_CACHE_HOME`, with

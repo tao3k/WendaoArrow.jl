@@ -2,8 +2,9 @@
 
 WendaoArrow is the Julia transport interface package for Wendao's Arrow-native
 plugin boundary. The local package runtime is now Flight-only. WendaoArrow
-ships package-local `Arrow.Flight.Service` composition plus an optional
-`gRPCServer` bridge; it no longer exposes local HTTP or IPC server helpers.
+ships package-local `Arrow.Flight.Service` composition plus packaged
+`PureHTTP2` listener helpers; it no longer exposes local HTTP or IPC server
+helpers.
 
 The first analyzer package now lives alongside it at `.data/WendaoAnalyzer`.
 
@@ -31,7 +32,7 @@ The Rust gateway remains in
 
 - `docs/`: package docs
 - `src/`: WendaoArrow Julia package
-- `test/`: package-local and cross-process Flight tests
+- `test/`: package-local Flight tests
 - `examples/`: Flight startup examples
 - `scripts/`: helper scripts for local Flight runs
 
@@ -50,13 +51,24 @@ Primary docs live under:
 - Preferred and packaged transport profile: `Arrow Flight`
 - Local service composition:
   `build_flight_service` / `build_stream_flight_service`
-- Optional network listener surface when `gRPCServer` is present:
+- Packaged network listener surface:
   `flight_server` / `serve_flight` / `serve_stream_flight`
+- Current packaged network backend support:
+  `:purehttp2` only
 - Cross-profile contract invariant:
   `wendao.schema_version = v1`
 
 WendaoArrow now assumes that any non-Flight fallback belongs to the host
 runtime, not to this Julia package.
+
+The package also now treats backend selection as an explicit compatibility
+contract. The packaged listener surface is Arrow Flight `DoExchange`, so any
+replacement backend must preserve request streaming, response streaming, and
+trailer-borne `grpc-status` completion. The requested `Nghttp2Wrapper.jl`
+backend now exists upstream behind the optional `Arrow.Flight.nghttp2_flight_server(...)`
+extension surface, but WendaoArrow keeps `:purehttp2` as its only packaged
+backend and fails explicit `:nghttp2` or retired `:grpcserver` backend
+requests up front.
 
 ## Quick Start
 
@@ -100,11 +112,10 @@ The launcher scripts now run against the root `WendaoArrow.jl` project. That
 keeps the source locks, example imports, and local CI bootstrap on one
 `Project.toml`.
 
-Start an optional Flight listener from Julia when `gRPCServer` is present:
+Start a packaged Flight listener from Julia:
 
 ```julia
 using WendaoArrow
-using gRPCServer
 using Tables
 
 server = WendaoArrow.serve_stream_flight(
@@ -119,8 +130,12 @@ server = WendaoArrow.serve_stream_flight(
     block = false,
 )
 
-gRPCServer.stop!(server; force = true)
+WendaoArrow.Arrow.Flight.stop!(server; force = true)
 ```
+
+The packaged listener wrappers keep runtime admission and buffering explicit
+through `max_active_requests`, `request_capacity`, and `response_capacity`,
+matching the current upstream `Arrow.Flight` listener surface.
 
 Config precedence is `defaults < TOML < flags`.
 
@@ -146,20 +161,26 @@ WendaoArrow exposes:
   `x-wendao-schema-version` request-header construction
 - `flight_exchange_request(source; descriptor = ..., headers = ...)` for one
   prepared `DoExchange` request wrapper
-- `flight_exchange_table(...)` for request-wrapper-driven local or client-side
+- `flight_exchange_table(...)` for request-wrapper-driven in-process
   `DoExchange` response decoding
 - `build_flight_service(processor)` for table-first local Flight `DoExchange`
   services
 - `build_stream_flight_service(processor)` for stream-first local Flight
   `DoExchange` services
-- `gateway_flight_client()` for the live Wendao gateway Flight client surface
-- `gateway_repo_search(...)` for the runtime-owned repo-search Flight route
-- `gateway_knowledge_search(...)` for the runtime-owned knowledge-search
-  Flight route
-- `flight_server(service)` for optional `gRPCServer`-backed listener
-  composition
-- `serve_flight(processor)` and `serve_stream_flight(processor)` for optional
-  Flight listeners when `gRPCServer` is loaded
+- `gateway_flight_descriptor(route)` for runtime-owned gateway route
+  normalization into a Flight path descriptor
+- `gateway_repo_search_headers(...)` and
+  `gateway_knowledge_search_headers(...)` for the runtime-owned gateway header
+  contract
+- `flight_server(service)` for packaged `PureHTTP2` listener composition with
+  explicit `max_active_requests`
+- `serve_flight(processor)` and `serve_stream_flight(processor)` for packaged
+  Flight listeners with explicit `max_active_requests`,
+  `request_capacity`, and `response_capacity` bounds
+- `flight_listener_backend_capabilities(...)` and
+  `flight_listener_backend_supported(...)` for the packaged listener backend
+  contract, delegated to the shared upstream `Arrow.Flight` backend profile
+  surface when that upstream API is available
 
 Downstream Julia packages with custom Arrow row contracts should prefer
 `schema_table(...)` over direct `Arrow.write(...)` calls. That keeps
@@ -179,9 +200,10 @@ that root is expected to come from the calling lane's own config or descriptor
 surface rather than from package-local numbered files. The canonical checked-in
 example servers remain under `examples/` and `scripts/`.
 
-When a downstream package is ready to actually emit a request, it should
-prefer `flight_exchange_request(...)` and `flight_exchange_table(...)` instead
-of manually threading source, descriptor, and headers at each call site.
+When a downstream package is ready to prepare an in-process request against a
+local `Arrow.Flight.Service`, it should prefer `flight_exchange_request(...)`
+and `flight_exchange_table(...)` instead of manually threading source,
+descriptor, and headers at each call site.
 
 The packaged `build_flight_service(...)` and `build_stream_flight_service(...)`
 surfaces now also accept `expected_schema_version = ...`, so draft downstream
@@ -214,12 +236,6 @@ analyzer-provided field metadata when packaged normalization runs through
 `normalize_scoring_response(...)`, force `wendao.schema_version = v1`, and do
 not echo the request descriptor back into outbound `FlightData`.
 
-The package-local `test/flight_grpcserver/parser_summary_roundtrip.jl` lane now
-also treats the committed `package.mo` parser-summary request as the canonical
-large-response transport contract. That proof distinguishes cold-start request
-cost from warm same-server transport cost so transport work is not conflated
-with child-process startup or first-request JIT.
-
 When a processor needs sideband batch diagnostics or provenance on the Flight
 wire, wrap the response in upstream `Arrow.Flight.withappmetadata(...)`.
 WendaoArrow no longer owns a separate runtime carrier for response
@@ -228,11 +244,10 @@ WendaoArrow no longer owns a separate runtime carrier for response
 The metadata overlay path now rides on upstream `Arrow.withmetadata(...)`
 instead of package-local wrapper types.
 
-The packaged gateway client surface is explicit and separate from the local
-`v1` scoring-service contract. Gateway search helpers default to
-`x-wendao-schema-version = v2`, target the live runtime-owned routes
-`/search/repos/main` and `/search/knowledge`, and use upstream
-`Arrow.Flight.getflightinfo(...) + doget(...) + table(...)` under the hood.
+The live Rust gateway benchmark and packaged listener stress lane now run
+through Python clients. `WendaoArrow.jl` no longer owns a Julia-side Flight
+client compatibility surface; this package stops at server/runtime helpers
+plus shared gateway descriptor/header normalization.
 
 ## Contract Notes
 
@@ -262,27 +277,37 @@ Julia package-local validation:
 .data/WendaoArrow/scripts/test_wendao_arrow.sh
 ```
 
-Optional Flight server extension validation:
+Live Rust gateway benchmark:
 
 ```bash
-.data/WendaoArrow/scripts/test_wendao_arrow_flight.sh
+direnv exec . uv run python .data/WendaoArrow.jl/scripts/benchmark_gateway_flight.py --host 127.0.0.1 --port 9517 --query flight --limit 5 --samples 10 --route both
 ```
 
-Live gateway benchmark:
+Packaged listener stress benchmark:
 
 ```bash
-direnv exec . julia --project=.data/WendaoArrow .data/WendaoArrow/scripts/benchmark_gateway_flight.jl --host 127.0.0.1 --port 9517 --query flight --limit 5 --samples 10
+direnv exec . julia --project=.data/WendaoArrow.jl .data/WendaoArrow.jl/scripts/run_packaged_flight_benchmark_server.jl --host 127.0.0.1 --port 18815 --response-mode large_response --large-doc-bytes 2097152
 ```
+
+In another shell, drive that packaged listener with the Python Flight client:
+
+```bash
+direnv exec . uv run python .data/WendaoArrow.jl/scripts/benchmark_packaged_flight_listener.py --host 127.0.0.1 --port 18815 --workers 8 --samples 20 --request-rows 32
+```
+
+That split package-owned stress setup keeps WendaoArrow on server-only Julia
+dependencies while the benchmark client runs through `pyarrow.flight`. The
+Python side reports packaged listener `DoExchange` latency and throughput
+directly, including `p95` / `p99`, `ops_per_sec`, and
+`throughput_mib_per_sec`.
 
 The package-local regression matrix is split under `test/runtests/` into
-focused support, contract-helper, scoring/metadata-contract, local-Flight, and
-config files. The cross-process Flight regression matrix is split under
-`test/flight_grpcserver/` into focused support, bootstrap, roundtrip,
-contract-error, and response-error files.
+focused support, contract-helper, scoring/metadata-contract, local-Flight,
+packaged-benchmark-server, and config files.
 
 Current Flight verification covers:
 
-- extension loading and non-blocking listener startup
+- packaged PureHTTP2 listener startup and shutdown wrappers
 - request-side invalid-argument diagnostics for missing columns, duplicate
   `doc_id`, empty `doc_id`, non-numeric and non-finite `vector_score`, and
   invalid schema version
@@ -290,43 +315,30 @@ Current Flight verification covers:
   enum metadata
 - response-side invalid-argument diagnostics for scoring normalization failures
   and additive metadata response failures
-- native Julia error-path regression coverage with a narrow retry only for
-  transient `Deadline exceeded.` harness noise during cross-process proof
-- schema metadata and field metadata preservation through local and remote
-  Flight response paths
-- response `app_metadata` preservation through local Flight plus cross-process
-  `pyarrow.flight` and native Julia `DoExchange`
+- schema metadata and field metadata preservation through packaged local Flight
+  response paths
+- response `app_metadata` preservation through packaged local `DoExchange`
+- packaged benchmark-server argument coverage for the package-owned
+  `PureHTTP2` listener stress harness
 
-Current cross-process status is narrower than the package-local matrix:
+The broader live-network interop and `pyarrow.flight` listener proofs now live
+upstream in `arrow-julia`'s `PureHTTP2` Flight suite, while WendaoArrow keeps
+its package-local contract and listener-wrapper regression surface bounded.
 
-- `test/runtests.jl` does not currently include `test/flight_grpcserver.jl`;
-  run the cross-process matrix directly when debugging transport behavior
-- `test/flight_grpcserver/support.jl` now instantiates the active project
-  instead of patching a temporary environment; use
-  `julia --project=.data/WendaoArrow.jl -e 'using Pkg; Pkg.test(; test_args=["flight_grpcserver"])'`
-  when running the cross-process matrix directly so the root project and
-  `test` target provide the required transport dependencies
-- the harness now accepts either
-  `.cache/arrow-julia-flight-pyenv/bin/python` or
-  `.cache/arrow-julia-flight-pyenv/.venv/bin/python` for the local
-  `pyarrow.flight` environment
-- in the current workspace snapshot, the direct
-  `direnv exec . julia --project=.data/WendaoArrow.jl .data/WendaoArrow.jl/test/flight_grpcserver.jl`
-  matrix now passes for both `pyarrow.flight` and native Julia across scoring,
-  metadata, schema-metadata, and error-contract cases
-- the native Julia transport closure came from two upstream fixes in the local
-  Julia stack:
-  - server-side HTTP/2 SETTINGS no longer emit `ENABLE_PUSH`
-  - public invalid-argument gRPC responses unwrap `ArgumentError` into plain
-    contract text
-- the shared `WendaoArrow.jl` substrate now also has generic cross-process
-  list-column proofs:
-  - native Julia and `pyarrow.flight` pass table-first list request/response
-    roundtrips
-  - native Julia also passes the same list contract over the routed
-    `/graph/structural/rerank` descriptor
-  - native Julia also passes that routed list contract with Search-like
-    additive request headers
-- the remaining native Julia live blocker is therefore narrower than generic
-  list transport: it now sits in the exact `WendaoSearch.jl` `v0-draft`
-  structural contract shape or the current demo processor path
+## Production Runtime Guidance
+
+For Rust gateway deployments that drive high-intensity analysis or compute
+traffic into the Julia listener, keep the runtime budget explicit instead of
+relying on unbounded queueing:
+
+- set `JULIA_NUM_THREADS` to the compute capacity actually reserved for the
+  Julia worker process
+- keep `max_active_requests` finite so the listener sheds overload with a
+  clear Flight error instead of admitting unbounded concurrent compute work
+- keep `request_capacity` and `response_capacity` finite so bursts from the
+  Rust gateway turn into bounded backpressure rather than unbounded memory
+  growth
+- use `scripts/test_packaged_flight_stress.sh` for one package-owned end-to-end
+  proof of `Julia PureHTTP2 listener -> Python Flight client`, and then scale
+  the worker/sample/doc-size environment variables to match the expected Rust
+  gateway load profile before raising production budgets

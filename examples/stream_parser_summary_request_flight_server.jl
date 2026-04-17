@@ -1,5 +1,4 @@
 using WendaoArrow
-using gRPCServer
 
 include("support.jl")
 

@@ -4,6 +4,149 @@
     @test descriptor.path == collect(WendaoArrow.DEFAULT_FLIGHT_DESCRIPTOR_PATH)
 end
 
+@testset "Flight listener backend contract is explicit" begin
+    purehttp2 = WendaoArrow.flight_listener_backend_capabilities()
+    @test purehttp2.backend == :purehttp2
+    @test purehttp2.request_streaming
+    @test purehttp2.response_streaming
+    @test purehttp2.response_trailers
+    @test purehttp2.bidirectional_doexchange
+    @test isempty(purehttp2.blockers)
+    @test WendaoArrow.flight_listener_backend_supported()
+
+    legacy_failure = try
+        WendaoArrow.flight_listener_backend_capabilities(:grpcserver)
+        nothing
+    catch error
+        error
+    end
+    @test legacy_failure isa ArgumentError
+    legacy_message = sprint(showerror, legacy_failure)
+    @test occursin("backend :grpcserver", legacy_message)
+    @test occursin("retired", legacy_message)
+    @test occursin(":purehttp2", legacy_message)
+
+    nghttp2 = WendaoArrow.flight_listener_backend_capabilities(:nghttp2)
+    @test nghttp2.backend == :nghttp2
+    @test !nghttp2.request_streaming
+    @test !nghttp2.response_streaming
+    @test !nghttp2.response_trailers
+    @test !nghttp2.bidirectional_doexchange
+    @test length(nghttp2.blockers) == 2
+    @test occursin("Nghttp2Wrapper", nghttp2.blockers[1])
+    @test occursin("PureHTTP2", nghttp2.blockers[2])
+    @test !WendaoArrow.flight_listener_backend_supported(:nghttp2)
+    @test_throws ArgumentError WendaoArrow.flight_listener_backend_capabilities(:unknown)
+end
+
+@testset "Unsupported Flight listener backends fail explicitly" begin
+    listener_message = try
+        service = WendaoArrow.build_flight_service(identity)
+        WendaoArrow.flight_server(service; backend = :nghttp2)
+        nothing
+    catch error
+        @test error isa ArgumentError
+        sprint(showerror, error)
+    end
+    @test !isnothing(listener_message)
+    @test occursin("backend :nghttp2", listener_message)
+    @test occursin("Nghttp2Wrapper", listener_message)
+    @test occursin("PureHTTP2", listener_message)
+
+    stream_message = try
+        WendaoArrow.serve_stream_flight(identity; backend = :nghttp2)
+        nothing
+    catch error
+        @test error isa ArgumentError
+        sprint(showerror, error)
+    end
+    @test !isnothing(stream_message)
+    @test occursin("Nghttp2Wrapper", stream_message)
+    @test occursin("PureHTTP2", stream_message)
+end
+
+@testset "PureHTTP2 listener wrappers start local servers" begin
+    service = WendaoArrow.build_flight_service(identity)
+    server = WendaoArrow.flight_server(
+        service;
+        host = WendaoArrow.DEFAULT_HOST,
+        port = 0,
+        max_active_requests = 2,
+        request_capacity = 4,
+        response_capacity = 4,
+    )
+
+    try
+        @test isopen(server)
+        @test hasproperty(server, :host)
+        @test hasproperty(server, :port)
+        @test server.port > 0
+        @test getfield(server, :request_gate).max_active_requests == 2
+    finally
+        Arrow.Flight.stop!(server; force = true)
+    end
+
+    unary_server = WendaoArrow.serve_flight(
+        identity;
+        host = WendaoArrow.DEFAULT_HOST,
+        port = 0,
+        include_request_app_metadata = true,
+        max_active_requests = 2,
+        request_capacity = 4,
+        response_capacity = 4,
+        block = false,
+    )
+
+    try
+        @test isopen(unary_server)
+        @test hasproperty(unary_server, :port)
+        @test unary_server.port > 0
+        @test getfield(unary_server, :request_gate).max_active_requests == 2
+    finally
+        Arrow.Flight.stop!(unary_server; force = true)
+    end
+
+    streaming_server = WendaoArrow.serve_stream_flight(
+        stream -> begin
+            doc_ids = String[]
+            analyzer_scores = Float64[]
+            final_scores = Float64[]
+
+            for batch in stream
+                columns = Tables.columntable(batch)
+                for (doc_id, vector_score) in zip(columns.doc_id, columns.vector_score)
+                    score = Float64(vector_score)
+                    push!(doc_ids, doc_id)
+                    push!(analyzer_scores, score)
+                    push!(final_scores, score + 1.0)
+                end
+            end
+
+            return (
+                doc_id = doc_ids,
+                analyzer_score = analyzer_scores,
+                final_score = final_scores,
+            )
+        end;
+        host = WendaoArrow.DEFAULT_HOST,
+        port = 0,
+        include_request_app_metadata = true,
+        max_active_requests = 2,
+        request_capacity = 4,
+        response_capacity = 4,
+        block = false,
+    )
+
+    try
+        @test isopen(streaming_server)
+        @test hasproperty(streaming_server, :port)
+        @test streaming_server.port > 0
+        @test getfield(streaming_server, :request_gate).max_active_requests == 2
+    finally
+        Arrow.Flight.stop!(streaming_server; force = true)
+    end
+end
+
 @testset "Flight exchange request wrapper prepares one request" begin
     descriptor = WendaoArrow.flight_route_descriptor("/graph/structural/rerank")
     request = WendaoArrow.flight_exchange_request(

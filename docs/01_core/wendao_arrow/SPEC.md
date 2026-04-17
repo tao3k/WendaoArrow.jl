@@ -4,9 +4,9 @@
 
 WendaoArrow is a Julia transport interface package for validating a pluggable
 Arrow-native data path from the existing Wendao Rust gateway to Julia. The
-current package implementation is Flight-only locally and exposes optional
-`gRPCServer`-backed Flight server helpers over the same analyzer-facing
-processor contract.
+current package implementation is Flight-only locally and exposes packaged
+`PureHTTP2` Flight server helpers over the same analyzer-facing processor
+contract.
 
 ## Scope
 
@@ -15,8 +15,7 @@ This MVP covers:
 - the reusable Julia transport interface
 - generic Arrow request and response transport over Flight
 - package-local Flight `DoExchange` service composition over `Arrow.Flight`
-- optional `gRPCServer`-backed Flight server helpers over the same processor
-  contracts
+- packaged `PureHTTP2` Flight server helpers over the same processor contracts
 - transport-profile documentation for future Flight adoption
 - documentation for Rust gateway integration
 
@@ -36,8 +35,8 @@ This MVP does not cover:
   timeout, and response validation.
 - WendaoArrow owns the Arrow contract layer plus package-local Flight
   transport composition.
-- WendaoArrow may expose Flight service and optional server adapters without
-  owning network transport negotiation.
+- WendaoArrow may expose Flight service and packaged listener adapters without
+  owning host-level transport negotiation.
 - Future analyzer packages own domain-specific scoring and schema semantics.
 - Arrow-native columnar payloads are the canonical data plane across the
   boundary.
@@ -60,7 +59,7 @@ This MVP does not cover:
 - Example Flight scoring server: `examples/stream_scoring_flight_server.jl`
 - Local Flight service seam: `build_flight_service` /
   `build_stream_flight_service`
-- Optional Flight server bridge: `flight_server` / `serve_flight` /
+- Packaged Flight listener helpers: `flight_server` / `serve_flight` /
   `serve_stream_flight`
 - Rust gateway integration anchor: `packages/rust/crates/xiuxian-wendao/src/gateway/`
 

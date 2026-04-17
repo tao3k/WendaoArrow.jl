@@ -14,9 +14,10 @@ Any host-level fallback strategy remains outside this Julia package.
 Flight-native:
 
 - in-tree Flight protocol bindings
-- native client helpers
+- Python-owned live interoperability proofs plus optional upstream extension
+  backends
 - transport-agnostic server composition
-- optional `gRPCServer.jl` bridge
+- packaged `PureHTTP2.jl` listener helpers
 - Arrow-owned metadata overlay helpers
 - Arrow-owned logical and extension runtime support
 
@@ -42,8 +43,17 @@ The package exposes:
   `Arrow.Flight.pathdescriptor(...)`
 - `build_flight_service(processor)` for table-first `DoExchange`
 - `build_stream_flight_service(processor)` for stream-first `DoExchange`
-- `flight_server`, `serve_flight`, and `serve_stream_flight` behind the weak
-  `gRPCServer` dependency
+- `flight_server`, `serve_flight`, and `serve_stream_flight` through the
+  built-in `PureHTTP2` listener path
+- `flight_listener_backend_capabilities(...)` and
+  `flight_listener_backend_supported(...)` for the packaged network-listener
+  backend contract, delegated to upstream `Arrow.Flight`
+
+The packaged listener wrappers keep three runtime bounds explicit:
+
+- `max_active_requests` for concurrency admission control
+- `request_capacity` for request-stream buffering
+- `response_capacity` for response-stream buffering
 
 Current response encoding treats the incoming `FlightDescriptor` as a routing
 input, not as a response echo contract. Outbound `FlightData` preserves
@@ -66,6 +76,12 @@ WendaoArrow now keeps that surface at the same abstraction level through
 upstream `Arrow.Flight.withappmetadata(...)` instead of a package-owned
 runtime carrier.
 
+Current packaged backend support remains `:purehttp2` only. The requested
+`Nghttp2Wrapper.jl` backend is not accepted as a packaged listener backend yet
+because upstream `Arrow.Flight` ships that backend only behind the optional
+`Nghttp2Wrapper.jl` extension surface, while WendaoArrow keeps `:purehttp2`
+as the only packaged default backend for its listener wrappers.
+
 ## Host Runtime Boundary
 
 WendaoArrow no longer ships local HTTP or IPC server helpers.
@@ -86,14 +102,14 @@ responsibilities.
 
 Near-term package work should follow these rules:
 
-- keep the Flight `DoExchange` adapter and optional `gRPCServer` bridge aligned
-  with the stream-first processor contract
+- keep the built-in `PureHTTP2` listener wrappers aligned with the stream-first
+  processor contract
 - keep server-side Flight responses descriptor-free unless a concrete
   interoperability requirement proves otherwise
 - keep new examples and analyzer guidance Flight-first and stream-first
 - validate request-batch column contracts close to the analyzer seam so remote
   Flight failures preserve actionable domain diagnostics
-- keep Flight server integration behind package-local extensions instead of
+- keep Flight server integration behind package-local wrappers instead of
   mixing selection logic into analyzer code
 - preserve schema-version observability through Arrow schema metadata on every
   packaged response path
