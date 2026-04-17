@@ -16,6 +16,8 @@ const PackagedFlightBenchServer = WendaoArrowPackagedFlightBenchmarkServer
         "65536",
         "--processing-delay-ms",
         "5",
+        "--max-active-requests",
+        "7",
         "--request-capacity",
         "8",
         "--response-capacity",
@@ -27,12 +29,17 @@ const PackagedFlightBenchServer = WendaoArrowPackagedFlightBenchmarkServer
     @test config.response_mode == :large_response
     @test config.large_doc_bytes == 65536
     @test config.processing_delay_ms == 5
+    @test config.max_active_requests == 7
     @test config.request_capacity == 8
     @test config.response_capacity == 9
 
     @test_throws ArgumentError PackagedFlightBenchServer.parse_server_args([
         "--response-mode",
         "bad",
+    ])
+    @test_throws ArgumentError PackagedFlightBenchServer.parse_server_args([
+        "--max-active-requests",
+        "0",
     ])
     @test_throws ArgumentError PackagedFlightBenchServer.parse_server_args([
         "--request-capacity",

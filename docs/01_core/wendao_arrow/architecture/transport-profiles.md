@@ -14,7 +14,8 @@ Any host-level fallback strategy remains outside this Julia package.
 Flight-native:
 
 - in-tree Flight protocol bindings
-- native client helpers
+- Python-owned live interoperability proofs plus optional upstream extension
+  backends
 - transport-agnostic server composition
 - packaged `PureHTTP2.jl` listener helpers
 - Arrow-owned metadata overlay helpers
@@ -48,8 +49,9 @@ The package exposes:
   `flight_listener_backend_supported(...)` for the packaged network-listener
   backend contract, delegated to upstream `Arrow.Flight`
 
-The packaged listener wrappers keep two runtime bounds explicit:
+The packaged listener wrappers keep three runtime bounds explicit:
 
+- `max_active_requests` for concurrency admission control
 - `request_capacity` for request-stream buffering
 - `response_capacity` for response-stream buffering
 

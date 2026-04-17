@@ -71,6 +71,7 @@ end
         service;
         host = WendaoArrow.DEFAULT_HOST,
         port = 0,
+        max_active_requests = 2,
         request_capacity = 4,
         response_capacity = 4,
     )
@@ -80,6 +81,7 @@ end
         @test hasproperty(server, :host)
         @test hasproperty(server, :port)
         @test server.port > 0
+        @test getfield(server, :request_gate).max_active_requests == 2
     finally
         Arrow.Flight.stop!(server; force = true)
     end
@@ -89,6 +91,7 @@ end
         host = WendaoArrow.DEFAULT_HOST,
         port = 0,
         include_request_app_metadata = true,
+        max_active_requests = 2,
         request_capacity = 4,
         response_capacity = 4,
         block = false,
@@ -98,6 +101,7 @@ end
         @test isopen(unary_server)
         @test hasproperty(unary_server, :port)
         @test unary_server.port > 0
+        @test getfield(unary_server, :request_gate).max_active_requests == 2
     finally
         Arrow.Flight.stop!(unary_server; force = true)
     end
@@ -127,6 +131,7 @@ end
         host = WendaoArrow.DEFAULT_HOST,
         port = 0,
         include_request_app_metadata = true,
+        max_active_requests = 2,
         request_capacity = 4,
         response_capacity = 4,
         block = false,
@@ -136,6 +141,7 @@ end
         @test isopen(streaming_server)
         @test hasproperty(streaming_server, :port)
         @test streaming_server.port > 0
+        @test getfield(streaming_server, :request_gate).max_active_requests == 2
     finally
         Arrow.Flight.stop!(streaming_server; force = true)
     end

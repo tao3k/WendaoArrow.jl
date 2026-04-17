@@ -133,9 +133,9 @@ server = WendaoArrow.serve_stream_flight(
 WendaoArrow.Arrow.Flight.stop!(server; force = true)
 ```
 
-The packaged listener wrappers keep per-stream buffering explicit through
-`request_capacity` and `response_capacity`, matching the current upstream
-`Arrow.Flight` listener surface.
+The packaged listener wrappers keep runtime admission and buffering explicit
+through `max_active_requests`, `request_capacity`, and `response_capacity`,
+matching the current upstream `Arrow.Flight` listener surface.
 
 Config precedence is `defaults < TOML < flags`.
 
@@ -172,10 +172,11 @@ WendaoArrow exposes:
 - `gateway_repo_search_headers(...)` and
   `gateway_knowledge_search_headers(...)` for the runtime-owned gateway header
   contract
-- `flight_server(service)` for packaged `PureHTTP2` listener composition
+- `flight_server(service)` for packaged `PureHTTP2` listener composition with
+  explicit `max_active_requests`
 - `serve_flight(processor)` and `serve_stream_flight(processor)` for packaged
-  Flight listeners with explicit `request_capacity` and
-  `response_capacity` bounds
+  Flight listeners with explicit `max_active_requests`,
+  `request_capacity`, and `response_capacity` bounds
 - `flight_listener_backend_capabilities(...)` and
   `flight_listener_backend_supported(...)` for the packaged listener backend
   contract, delegated to the shared upstream `Arrow.Flight` backend profile
@@ -332,6 +333,8 @@ relying on unbounded queueing:
 
 - set `JULIA_NUM_THREADS` to the compute capacity actually reserved for the
   Julia worker process
+- keep `max_active_requests` finite so the listener sheds overload with a
+  clear Flight error instead of admitting unbounded concurrent compute work
 - keep `request_capacity` and `response_capacity` finite so bursts from the
   Rust gateway turn into bounded backpressure rather than unbounded memory
   growth

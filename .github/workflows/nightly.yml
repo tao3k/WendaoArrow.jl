@@ -101,6 +101,7 @@ jobs:
           WENDAO_ARROW_STRESS_REQUEST_ROWS: "32"
           WENDAO_ARROW_STRESS_DOC_BYTES: "2097152"
           WENDAO_ARROW_STRESS_PROCESSING_DELAY_MS: "5"
+          WENDAO_ARROW_STRESS_MAX_ACTIVE_REQUESTS: "8"
         run: |
           chmod +x ./scripts/test_packaged_flight_stress.sh
           ./scripts/test_packaged_flight_stress.sh
