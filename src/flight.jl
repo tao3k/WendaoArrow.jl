@@ -65,7 +65,8 @@ function flight_exchange_table(
     convert::Bool = true,
     include_app_metadata::Bool = false,
 )
-    req, request_stream, response = Arrow.Flight.doexchange(client; headers = request.headers)
+    req, request_stream, response =
+        Arrow.Flight.doexchange(client; headers = request.headers)
     producer = @async Arrow.Flight.putflightdata!(
         request_stream,
         request.source;
