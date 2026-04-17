@@ -50,14 +50,17 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           brew install autoconf automake libtool pkg-config
-      - uses: julia-actions/julia-buildpkg@v1.6
-        with:
-          project: .
-      - uses: julia-actions/julia-runtest@v1
+      - name: Resolve and build package
+        env:
+          JULIA_PKG_PRECOMPILE_AUTO: "0"
+        run: |
+          julia --project=. -e 'using Pkg; Pkg.resolve(); Pkg.instantiate(); Pkg.build()'
+      - name: Run package tests
         env:
           JULIA_NUM_THREADS: ${{ matrix.nthreads }}
-        with:
-          project: .
+          JULIA_PKG_PRECOMPILE_AUTO: "0"
+        run: |
+          julia --project=. -e 'using Pkg; Pkg.test("WendaoArrow"; coverage=false)'
 
   packaged-flight-stress:
     name: Packaged Flight stress - ubuntu-latest
@@ -88,9 +91,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install pyarrow
-      - uses: julia-actions/julia-buildpkg@v1.6
-        with:
-          project: .
+      - name: Resolve and build package
+        env:
+          JULIA_PKG_PRECOMPILE_AUTO: "0"
+        run: |
+          julia --project=. -e 'using Pkg; Pkg.resolve(); Pkg.instantiate(); Pkg.build()'
       - name: Run packaged Flight stress lane
         env:
           JULIA_NUM_THREADS: "2"
