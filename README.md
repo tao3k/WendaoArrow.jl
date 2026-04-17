@@ -326,3 +326,23 @@ Current Flight verification covers:
 The broader live-network interop and `pyarrow.flight` listener proofs now live
 upstream in `arrow-julia`'s `PureHTTP2` Flight suite, while WendaoArrow keeps
 its package-local contract and listener-wrapper regression surface bounded.
+
+## Production Runtime Guidance
+
+For Rust gateway deployments that drive high-intensity analysis or compute
+traffic into the Julia listener, keep the runtime budget explicit instead of
+relying on unbounded queueing:
+
+- set `JULIA_NUM_THREADS` to the compute capacity actually reserved for the
+  Julia worker process
+- size `max_active_requests` to the amount of concurrent work the process can
+  finish without thrashing; the packaged default is
+  `max(Base.Threads.nthreads() * 8, 32)`, but production lanes should tighten
+  that bound when each request performs heavier analysis
+- keep `request_capacity` and `response_capacity` finite so bursts from the
+  Rust gateway turn into bounded backpressure rather than unbounded memory
+  growth
+- use `scripts/test_packaged_flight_stress.sh` for one package-owned end-to-end
+  proof of `Julia PureHTTP2 listener -> Python Flight client`, and then scale
+  the worker/sample/doc-size environment variables to match the expected Rust
+  gateway load profile before raising production budgets
