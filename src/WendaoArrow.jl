@@ -87,6 +87,15 @@ function _require_arrow_purehttp2_listener(subject::AbstractString)
     )
 end
 
+function _flight_listener_constructor(backend::Symbol, subject::AbstractString)
+    if backend == :purehttp2
+        _require_arrow_purehttp2_listener(subject)
+        return getfield(Arrow.Flight, :purehttp2_flight_server)
+    end
+
+    throw(ArgumentError("$(subject) does not provide a listener constructor for backend :$(backend)"))
+end
+
 function flight_server(
     service::Arrow.Flight.Service;
     host::AbstractString = DEFAULT_HOST,
@@ -97,8 +106,8 @@ function flight_server(
     backend::Symbol = :purehttp2,
 )
     require_flight_listener_backend(backend; subject = "WendaoArrow.flight_server")
-    _require_arrow_purehttp2_listener("WendaoArrow.flight_server")
-    return getfield(Arrow.Flight, :purehttp2_flight_server)(
+    constructor = _flight_listener_constructor(backend, "WendaoArrow.flight_server")
+    return constructor(
         service;
         host = host,
         port = port,

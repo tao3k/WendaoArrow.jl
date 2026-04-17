@@ -59,6 +59,7 @@ its packaged network listener surface.
 """
 function flight_listener_backend_capabilities(backend::Symbol = :purehttp2)
     backend == :grpcserver && _legacy_flight_listener_backend_error()
+    backend == :purehttp2 || return _fallback_flight_listener_backend_capabilities(backend)
     return isdefined(Arrow.Flight, :flight_server_backend_capabilities) ?
            getfield(Arrow.Flight, :flight_server_backend_capabilities)(backend) :
            _fallback_flight_listener_backend_capabilities(backend)
@@ -70,6 +71,7 @@ that WendaoArrow requires for its packaged network listener.
 """
 function flight_listener_backend_supported(backend::Symbol = :purehttp2)
     backend == :grpcserver && _legacy_flight_listener_backend_error()
+    backend == :purehttp2 || return false
     return isdefined(Arrow.Flight, :flight_server_backend_supported) ?
            getfield(Arrow.Flight, :flight_server_backend_supported)(backend) :
     begin
@@ -86,7 +88,7 @@ function require_flight_listener_backend(
     subject::AbstractString = "WendaoArrow Flight listener",
 )
     backend == :grpcserver && _legacy_flight_listener_backend_error()
-    if isdefined(Arrow.Flight, :require_flight_server_backend)
+    if backend == :purehttp2 && isdefined(Arrow.Flight, :require_flight_server_backend)
         return getfield(Arrow.Flight, :require_flight_server_backend)(
             backend;
             subject = subject,
