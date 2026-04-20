@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_PATH="${WENDAO_ARROW_BOOTSTRAP_ENV:-$(mktemp -d)}"
 
 if [[ -n "${PYTHON:-}" ]]; then
   read -r -a PYTHON_CMD <<<"${PYTHON}"
@@ -48,13 +49,21 @@ cleanup() {
     wait "${SERVER_PID}" 2>/dev/null || true
   fi
   rm -f "${SERVER_LOG}"
+  if [[ -z "${WENDAO_ARROW_BOOTSTRAP_ENV:-}" ]]; then
+    rm -rf "${ENV_PATH}"
+  fi
 }
 
 trap cleanup EXIT
 
+export WENDAO_ARROW_BOOTSTRAP_ENV="${ENV_PATH}"
+if [[ ! -f "${ENV_PATH}/Project.toml" ]]; then
+  "${JULIA_CMD[@]}" "${ROOT}/scripts/prepare_wendao_arrow_env.jl"
+fi
+
 "${JULIA_CMD[@]}" \
   --threads="${THREADS}" \
-  --project="${ROOT}" \
+  --project="${ENV_PATH}" \
   "${ROOT}/scripts/run_packaged_flight_benchmark_server.jl" \
   --host "${HOST}" \
   --port "${PORT}" \

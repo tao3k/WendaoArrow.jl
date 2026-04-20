@@ -15,7 +15,7 @@ end
 function _legacy_flight_listener_backend_error()
     throw(
         ArgumentError(
-            "WendaoArrow Flight listener backend :grpcserver has been retired; use :purehttp2",
+            "WendaoArrow Flight listener backend :grpcserver has been retired; use the Arrow-provided HTTP/2 listener surface via :purehttp2",
         ),
     )
 end
@@ -41,7 +41,7 @@ function _fallback_flight_listener_backend_capabilities(backend::Symbol = :pureh
             false,
             String[
                 "Arrow.jl ships the nghttp2 backend behind the optional Nghttp2Wrapper.jl extension; load Nghttp2Wrapper to activate it",
-                "PureHTTP2 remains the only default packaged Flight listener backend",
+                "Arrow.jl keeps :purehttp2 as the default Flight listener backend that WendaoArrow packages",
             ],
         )
     end
@@ -55,7 +55,7 @@ end
 
 """
 Return the shared Arrow Flight server backend contract that WendaoArrow uses for
-its packaged network listener surface.
+its Arrow-provided network listener wrappers.
 """
 function flight_listener_backend_capabilities(backend::Symbol = :purehttp2)
     backend == :grpcserver && _legacy_flight_listener_backend_error()
@@ -67,7 +67,7 @@ end
 
 """
 Return whether one backend satisfies the shared Arrow Flight server contract
-that WendaoArrow requires for its packaged network listener.
+that WendaoArrow requires for its Arrow-provided network listener wrappers.
 """
 function flight_listener_backend_supported(backend::Symbol = :purehttp2)
     backend == :grpcserver && _legacy_flight_listener_backend_error()

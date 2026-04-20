@@ -2,16 +2,16 @@
 
 WendaoArrow is the Julia transport interface package for Wendao's Arrow-native
 plugin boundary. The local package runtime is now Flight-only. WendaoArrow
-ships package-local `Arrow.Flight.Service` composition plus packaged
-`PureHTTP2` listener helpers; it no longer exposes local HTTP or IPC server
-helpers.
+ships package-local `Arrow.Flight.Service` composition plus Arrow-provided
+HTTP/2 listener helpers; it no longer exposes local HTTP or IPC server
+helpers of its own.
 
-The first analyzer package now lives alongside it at `.data/WendaoAnalyzer`.
+The first analyzer package now lives alongside it in the sibling
+`WendaoAnalyzer.jl` package.
 
 In this workspace, `Arrow` stays pinned to the upstream `arrow-julia` main
 revision through `Project.toml` source locks, so package bootstrap and CI use
-the same `Arrow` / `ArrowTypes` transport revision without requiring a sibling
-checkout.
+the same Arrow transport revision without requiring a sibling checkout.
 
 ## What This Package Owns
 
@@ -54,7 +54,7 @@ Primary docs live under:
 - Packaged network listener surface:
   `flight_server` / `serve_flight` / `serve_stream_flight`
 - Current packaged network backend support:
-  `:purehttp2` only
+  `:purehttp2` compatibility selector only
 - Cross-profile contract invariant:
   `wendao.schema_version = v1`
 
@@ -66,46 +66,46 @@ contract. The packaged listener surface is Arrow Flight `DoExchange`, so any
 replacement backend must preserve request streaming, response streaming, and
 trailer-borne `grpc-status` completion. The requested `Nghttp2Wrapper.jl`
 backend now exists upstream behind the optional `Arrow.Flight.nghttp2_flight_server(...)`
-extension surface, but WendaoArrow keeps `:purehttp2` as its only packaged
-backend and fails explicit `:nghttp2` or retired `:grpcserver` backend
-requests up front.
+extension surface, but WendaoArrow keeps the Arrow-provided `:purehttp2`
+listener contract as its only packaged backend and fails explicit `:nghttp2`
+or retired `:grpcserver` backend requests up front.
 
 ## Quick Start
 
 Start the stream-first scoring Flight server:
 
 ```bash
-.data/WendaoArrow.jl/scripts/run_stream_scoring_flight_server.sh --host 127.0.0.1 --port 18815
+scripts/run_stream_scoring_flight_server.sh --host 127.0.0.1 --port 18815
 ```
 
 Start the metadata-aware Flight server:
 
 ```bash
-.data/WendaoArrow.jl/scripts/run_stream_metadata_flight_server.sh --host 127.0.0.1 --port 18815
+scripts/run_stream_metadata_flight_server.sh --host 127.0.0.1 --port 18815
 ```
 
 Start the schema-metadata preservation Flight server:
 
 ```bash
-.data/WendaoArrow.jl/scripts/run_stream_schema_metadata_flight_server.sh --host 127.0.0.1 --port 18815
+scripts/run_stream_schema_metadata_flight_server.sh --host 127.0.0.1 --port 18815
 ```
 
 Start the response-`app_metadata` Flight server:
 
 ```bash
-.data/WendaoArrow.jl/scripts/run_stream_app_metadata_flight_server.sh --host 127.0.0.1 --port 18815
+scripts/run_stream_app_metadata_flight_server.sh --host 127.0.0.1 --port 18815
 ```
 
 Use TOML:
 
 ```bash
-.data/WendaoArrow.jl/scripts/run_stream_scoring_flight_server.sh --config .data/WendaoArrow.jl/config/wendao_arrow.example.toml
+scripts/run_stream_scoring_flight_server.sh --config config/wendao_arrow.example.toml
 ```
 
 Or override with flags:
 
 ```bash
-.data/WendaoArrow.jl/scripts/run_stream_scoring_flight_server.sh --host 127.0.0.1 --port 18815
+scripts/run_stream_scoring_flight_server.sh --host 127.0.0.1 --port 18815
 ```
 
 The launcher scripts now run against the root `WendaoArrow.jl` project. That
@@ -172,7 +172,7 @@ WendaoArrow exposes:
 - `gateway_repo_search_headers(...)` and
   `gateway_knowledge_search_headers(...)` for the runtime-owned gateway header
   contract
-- `flight_server(service)` for packaged `PureHTTP2` listener composition with
+- `flight_server(service)` for Arrow-provided `:purehttp2` listener composition with
   explicit `max_active_requests`
 - `serve_flight(processor)` and `serve_stream_flight(processor)` for packaged
   Flight listeners with explicit `max_active_requests`,
@@ -274,25 +274,25 @@ on ingress before row iteration.
 Julia package-local validation:
 
 ```bash
-.data/WendaoArrow/scripts/test_wendao_arrow.sh
+scripts/test_wendao_arrow.sh
 ```
 
 Live Rust gateway benchmark:
 
 ```bash
-direnv exec . uv run python .data/WendaoArrow.jl/scripts/benchmark_gateway_flight.py --host 127.0.0.1 --port 9517 --query flight --limit 5 --samples 10 --route both
+uv run python scripts/benchmark_gateway_flight.py --host 127.0.0.1 --port 9517 --query flight --limit 5 --samples 10 --route both
 ```
 
 Packaged listener stress benchmark:
 
 ```bash
-direnv exec . julia --project=.data/WendaoArrow.jl .data/WendaoArrow.jl/scripts/run_packaged_flight_benchmark_server.jl --host 127.0.0.1 --port 18815 --response-mode large_response --large-doc-bytes 2097152
+julia --project=. scripts/run_packaged_flight_benchmark_server.jl --host 127.0.0.1 --port 18815 --response-mode large_response --large-doc-bytes 2097152
 ```
 
 In another shell, drive that packaged listener with the Python Flight client:
 
 ```bash
-direnv exec . uv run python .data/WendaoArrow.jl/scripts/benchmark_packaged_flight_listener.py --host 127.0.0.1 --port 18815 --workers 8 --samples 20 --request-rows 32
+uv run python scripts/benchmark_packaged_flight_listener.py --host 127.0.0.1 --port 18815 --workers 8 --samples 20 --request-rows 32
 ```
 
 That split package-owned stress setup keeps WendaoArrow on server-only Julia
@@ -307,7 +307,7 @@ packaged-benchmark-server, and config files.
 
 Current Flight verification covers:
 
-- packaged PureHTTP2 listener startup and shutdown wrappers
+- Arrow-provided `:purehttp2` listener startup and shutdown wrappers
 - request-side invalid-argument diagnostics for missing columns, duplicate
   `doc_id`, empty `doc_id`, non-numeric and non-finite `vector_score`, and
   invalid schema version
@@ -318,11 +318,11 @@ Current Flight verification covers:
 - schema metadata and field metadata preservation through packaged local Flight
   response paths
 - response `app_metadata` preservation through packaged local `DoExchange`
-- packaged benchmark-server argument coverage for the package-owned
-  `PureHTTP2` listener stress harness
+- packaged benchmark-server argument coverage for the Arrow-provided
+  `:purehttp2` listener stress harness
 
 The broader live-network interop and `pyarrow.flight` listener proofs now live
-upstream in `arrow-julia`'s `PureHTTP2` Flight suite, while WendaoArrow keeps
+upstream in `arrow-julia`'s `:purehttp2` Flight suite, while WendaoArrow keeps
 its package-local contract and listener-wrapper regression surface bounded.
 
 ## Production Runtime Guidance
@@ -339,6 +339,6 @@ relying on unbounded queueing:
   Rust gateway turn into bounded backpressure rather than unbounded memory
   growth
 - use `scripts/test_packaged_flight_stress.sh` for one package-owned end-to-end
-  proof of `Julia PureHTTP2 listener -> Python Flight client`, and then scale
+  proof of `Julia Arrow HTTP/2 listener -> Python Flight client`, and then scale
   the worker/sample/doc-size environment variables to match the expected Rust
   gateway load profile before raising production budgets

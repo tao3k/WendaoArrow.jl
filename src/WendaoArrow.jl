@@ -82,7 +82,7 @@ function _require_arrow_purehttp2_listener(subject::AbstractString)
     isdefined(Arrow.Flight, :purehttp2_flight_server) && return
     throw(
         ArgumentError(
-            "$(subject) requires an Arrow.jl revision that provides Arrow.Flight.purehttp2_flight_server(...)",
+            "$(subject) requires an Arrow.jl revision that provides the Arrow-owned HTTP/2 listener entrypoint Arrow.Flight.purehttp2_flight_server(...)",
         ),
     )
 end

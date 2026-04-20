@@ -25,6 +25,7 @@ end
     @test occursin("backend :grpcserver", legacy_message)
     @test occursin("retired", legacy_message)
     @test occursin(":purehttp2", legacy_message)
+    @test occursin("Arrow-provided HTTP/2 listener surface", legacy_message)
 
     nghttp2 = WendaoArrow.flight_listener_backend_capabilities(:nghttp2)
     @test nghttp2.backend == :nghttp2
@@ -34,7 +35,7 @@ end
     @test !nghttp2.bidirectional_doexchange
     @test length(nghttp2.blockers) == 2
     @test occursin("Nghttp2Wrapper", nghttp2.blockers[1])
-    @test occursin("PureHTTP2", nghttp2.blockers[2])
+    @test occursin(":purehttp2", nghttp2.blockers[2])
     @test !WendaoArrow.flight_listener_backend_supported(:nghttp2)
     @test_throws ArgumentError WendaoArrow.flight_listener_backend_capabilities(:unknown)
 end
@@ -51,7 +52,7 @@ end
     @test !isnothing(listener_message)
     @test occursin("backend :nghttp2", listener_message)
     @test occursin("Nghttp2Wrapper", listener_message)
-    @test occursin("PureHTTP2", listener_message)
+    @test occursin(":purehttp2", listener_message)
 
     stream_message = try
         WendaoArrow.serve_stream_flight(identity; backend = :nghttp2)
@@ -62,10 +63,10 @@ end
     end
     @test !isnothing(stream_message)
     @test occursin("Nghttp2Wrapper", stream_message)
-    @test occursin("PureHTTP2", stream_message)
+    @test occursin(":purehttp2", stream_message)
 end
 
-@testset "PureHTTP2 listener wrappers start local servers" begin
+@testset "Arrow HTTP/2 listener wrappers start local servers" begin
     service = WendaoArrow.build_flight_service(identity)
     server = WendaoArrow.flight_server(
         service;

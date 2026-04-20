@@ -4,9 +4,9 @@
 
 WendaoArrow is a Julia transport interface package for validating a pluggable
 Arrow-native data path from the existing Wendao Rust gateway to Julia. The
-current package implementation is Flight-only locally and exposes packaged
-`PureHTTP2` Flight server helpers over the same analyzer-facing processor
-contract.
+current package implementation is Flight-only locally and exposes
+Arrow-provided HTTP/2 Flight listener helpers over the same analyzer-facing
+processor contract.
 
 ## Scope
 
@@ -15,7 +15,8 @@ This MVP covers:
 - the reusable Julia transport interface
 - generic Arrow request and response transport over Flight
 - package-local Flight `DoExchange` service composition over `Arrow.Flight`
-- packaged `PureHTTP2` Flight server helpers over the same processor contracts
+- Arrow-provided HTTP/2 Flight listener helpers over the same processor
+  contracts
 - transport-profile documentation for future Flight adoption
 - documentation for Rust gateway integration
 
@@ -59,7 +60,7 @@ This MVP does not cover:
 - Example Flight scoring server: `examples/stream_scoring_flight_server.jl`
 - Local Flight service seam: `build_flight_service` /
   `build_stream_flight_service`
-- Packaged Flight listener helpers: `flight_server` / `serve_flight` /
+- Packaged Flight listener wrappers: `flight_server` / `serve_flight` /
   `serve_stream_flight`
 - Rust gateway integration anchor: `packages/rust/crates/xiuxian-wendao/src/gateway/`
 

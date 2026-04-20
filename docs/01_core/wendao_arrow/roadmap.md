@@ -14,8 +14,8 @@
 - land package-local `DoExchange` Flight service seams
 - keep server-side Flight response envelopes aligned with descriptor-free
   standard client expectations
-- land a package-owned `PureHTTP2` network listener surface without re-opening
-  a separate server package dependency
+- land a package-facing Arrow HTTP/2 network listener surface without
+  re-opening a separate transport package dependency
 
 ## Phase 2: Operational Hardening
 

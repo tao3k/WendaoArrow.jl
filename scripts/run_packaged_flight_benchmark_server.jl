@@ -1,9 +1,9 @@
 module WendaoArrowPackagedFlightBenchmarkServer
 
-using Tables
 using WendaoArrow
 
 const Arrow = WendaoArrow.Arrow
+const Tables = WendaoArrow.Tables
 
 Base.@kwdef struct PackagedFlightBenchmarkServerConfig
     host::String = WendaoArrow.DEFAULT_HOST
