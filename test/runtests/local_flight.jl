@@ -14,18 +14,17 @@ end
     @test isempty(grpcserver.blockers)
     @test WendaoArrow.flight_listener_backend_supported()
 
-    legacy_failure = try
+    unsupported_purehttp2 = try
         WendaoArrow.flight_listener_backend_capabilities(:purehttp2)
         nothing
     catch error
         error
     end
-    @test legacy_failure isa ArgumentError
-    legacy_message = sprint(showerror, legacy_failure)
-    @test occursin("backend :purehttp2", legacy_message)
-    @test occursin("retired", legacy_message)
-    @test occursin(":grpcserver", legacy_message)
-    @test occursin("packaged Arrow listener surface", legacy_message)
+    @test unsupported_purehttp2 isa ArgumentError
+    unsupported_purehttp2_message = sprint(showerror, unsupported_purehttp2)
+    @test occursin("backend :purehttp2", unsupported_purehttp2_message)
+    @test occursin(":grpcserver", unsupported_purehttp2_message)
+    @test !occursin("retired", unsupported_purehttp2_message)
 
     nghttp2 = WendaoArrow.flight_listener_backend_capabilities(:nghttp2)
     @test nghttp2.backend == :nghttp2

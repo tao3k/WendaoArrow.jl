@@ -12,18 +12,8 @@ else
     end
 end
 
-function _legacy_flight_listener_backend_error()
-    throw(
-        ArgumentError(
-            "WendaoArrow Flight listener backend :purehttp2 has been retired; use the packaged Arrow listener surface via :grpcserver",
-        ),
-    )
-end
-
 function _fallback_flight_listener_backend_capabilities(backend::Symbol = :grpcserver)
-    if backend == :purehttp2
-        _legacy_flight_listener_backend_error()
-    elseif backend == :grpcserver
+    if backend == :grpcserver
         return FlightListenerBackendCapabilities(
             :grpcserver,
             false,
@@ -32,7 +22,7 @@ function _fallback_flight_listener_backend_capabilities(backend::Symbol = :grpcs
             false,
             String[
                 "Arrow.jl ships the packaged Flight listener backend behind the optional gRPCServer.jl extension; load gRPCServer to activate it",
-                "The legacy Arrow-owned PureHTTP2 listener surface has been retired; gRPCServer.jl now owns the packaged HTTP/2 transport",
+                "gRPCServer.jl now owns the packaged HTTP/2 transport for the live Flight listener backend",
             ],
         )
     elseif backend == :nghttp2
@@ -61,7 +51,6 @@ Return the shared Arrow Flight server backend contract that WendaoArrow uses for
 its Arrow-provided network listener wrappers.
 """
 function flight_listener_backend_capabilities(backend::Symbol = :grpcserver)
-    backend == :purehttp2 && _legacy_flight_listener_backend_error()
     return isdefined(Arrow.Flight, :flight_server_backend_capabilities) ?
            getfield(Arrow.Flight, :flight_server_backend_capabilities)(backend) :
            _fallback_flight_listener_backend_capabilities(backend)
@@ -72,7 +61,6 @@ Return whether one backend satisfies the shared Arrow Flight server contract
 that WendaoArrow requires for its Arrow-provided network listener wrappers.
 """
 function flight_listener_backend_supported(backend::Symbol = :grpcserver)
-    backend == :purehttp2 && _legacy_flight_listener_backend_error()
     return isdefined(Arrow.Flight, :flight_server_backend_supported) ?
            getfield(Arrow.Flight, :flight_server_backend_supported)(backend) :
     begin
@@ -88,7 +76,6 @@ function require_flight_listener_backend(
     backend::Symbol = :grpcserver;
     subject::AbstractString = "WendaoArrow Flight listener",
 )
-    backend == :purehttp2 && _legacy_flight_listener_backend_error()
     if isdefined(Arrow.Flight, :require_flight_server_backend)
         return getfield(Arrow.Flight, :require_flight_server_backend)(
             backend;

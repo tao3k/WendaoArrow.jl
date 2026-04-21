@@ -80,8 +80,8 @@ Current packaged backend support remains `:grpcserver` as the only supported
 default. The requested `Nghttp2Wrapper.jl` backend is not accepted as a
 packaged listener backend yet because upstream `Arrow.Flight` ships that
 backend only behind the optional `Nghttp2Wrapper.jl` extension surface and it
-still lacks full request-streaming and bidirectional parity. WendaoArrow also
-treats the old `:purehttp2` selector as retired legacy now that the packaged
+still lacks full request-streaming and bidirectional parity. WendaoArrow does
+not keep a package-local `:purehttp2` compatibility path now that the packaged
 live backend is owned by `gRPCServer.jl`.
 
 ## Host Runtime Boundary

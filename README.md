@@ -68,7 +68,7 @@ trailer-borne `grpc-status` completion. The requested `Nghttp2Wrapper.jl`
 backend now exists upstream behind the optional `Arrow.Flight.nghttp2_flight_server(...)`
 extension surface, but WendaoArrow keeps the packaged `:grpcserver` listener
 contract as its only supported packaged backend and fails explicit `:nghttp2`
-or retired `:purehttp2` backend requests up front.
+or unsupported `:purehttp2` backend requests up front.
 
 ## Quick Start
 
