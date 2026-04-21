@@ -2,22 +2,22 @@
 
 ## Intent
 
-This document aligns WendaoArrow with the current Arrow ecosystem direction in
-`.data/arrow-julia`.
+This document aligns WendaoArrow with the current upstream `arrow-julia`
+direction.
 
 WendaoArrow now exposes one packaged local transport profile: Arrow Flight.
 Any host-level fallback strategy remains outside this Julia package.
 
 ## Current Arrow.jl Input
 
-`.data/arrow-julia` now provides the primitives WendaoArrow needs to stay
-Flight-native:
+The current `arrow-julia` mainline now provides the primitives WendaoArrow
+needs to stay Flight-native:
 
 - in-tree Flight protocol bindings
 - Python-owned live interoperability proofs plus optional upstream extension
   backends
 - transport-agnostic server composition
-- packaged `PureHTTP2.jl` listener helpers
+- packaged Flight listener helpers owned by `gRPCServer.jl`
 - Arrow-owned metadata overlay helpers
 - Arrow-owned logical and extension runtime support
 
@@ -44,7 +44,7 @@ The package exposes:
 - `build_flight_service(processor)` for table-first `DoExchange`
 - `build_stream_flight_service(processor)` for stream-first `DoExchange`
 - `flight_server`, `serve_flight`, and `serve_stream_flight` through the
-  built-in `PureHTTP2` listener path
+  packaged `:grpcserver` listener path
 - `flight_listener_backend_capabilities(...)` and
   `flight_listener_backend_supported(...)` for the packaged network-listener
   backend contract, delegated to upstream `Arrow.Flight`
@@ -76,11 +76,13 @@ WendaoArrow now keeps that surface at the same abstraction level through
 upstream `Arrow.Flight.withappmetadata(...)` instead of a package-owned
 runtime carrier.
 
-Current packaged backend support remains `:purehttp2` only. The requested
-`Nghttp2Wrapper.jl` backend is not accepted as a packaged listener backend yet
-because upstream `Arrow.Flight` ships that backend only behind the optional
-`Nghttp2Wrapper.jl` extension surface, while WendaoArrow keeps `:purehttp2`
-as the only packaged default backend for its listener wrappers.
+Current packaged backend support remains `:grpcserver` as the only supported
+default. The requested `Nghttp2Wrapper.jl` backend is not accepted as a
+packaged listener backend yet because upstream `Arrow.Flight` ships that
+backend only behind the optional `Nghttp2Wrapper.jl` extension surface and it
+still lacks full request-streaming and bidirectional parity. WendaoArrow does
+not keep a package-local `:purehttp2` compatibility path now that the packaged
+live backend is owned by `gRPCServer.jl`.
 
 ## Host Runtime Boundary
 
@@ -102,8 +104,8 @@ responsibilities.
 
 Near-term package work should follow these rules:
 
-- keep the built-in `PureHTTP2` listener wrappers aligned with the stream-first
-  processor contract
+- keep the packaged `:grpcserver` listener wrappers aligned with the
+  stream-first processor contract
 - keep server-side Flight responses descriptor-free unless a concrete
   interoperability requirement proves otherwise
 - keep new examples and analyzer guidance Flight-first and stream-first

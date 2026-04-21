@@ -20,9 +20,18 @@ jobs:
           - 2
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/checkout@v6
+        with:
+          repository: JuliaCN/arrow-julia
+          path: .deps/arrow-julia
       - uses: julia-actions/setup-julia@v2
         with:
           version: nightly
+      - name: Align arrow-julia checkout to Project.toml
+        run: |
+          ARROW_REV="$(julia -e 'using TOML; print(TOML.parsefile("Project.toml")["sources"]["Arrow"]["rev"])')"
+          git -C .deps/arrow-julia fetch --tags --prune origin
+          git -C .deps/arrow-julia checkout "${ARROW_REV}"
       - uses: actions/cache@v5
         env:
           cache-name: cache-artifacts
@@ -45,14 +54,19 @@ jobs:
       - name: Resolve and build package
         env:
           JULIA_PKG_PRECOMPILE_AUTO: "0"
+          WENDAO_ARROW_BOOTSTRAP_ENV: ${{ runner.temp }}/wendaoarrow-env
+          WENDAO_ARROW_LOCAL_ARROW_PATH: ${{ github.workspace }}/.deps/arrow-julia
         run: |
-          julia --project=. -e 'using Pkg; Pkg.resolve(); Pkg.instantiate(); Pkg.build()'
+          julia ./scripts/prepare_wendao_arrow_env.jl
       - name: Run package tests
         env:
           JULIA_NUM_THREADS: ${{ matrix.nthreads }}
           JULIA_PKG_PRECOMPILE_AUTO: "0"
+          WENDAO_ARROW_BOOTSTRAP_ENV: ${{ runner.temp }}/wendaoarrow-env
+          WENDAO_ARROW_LOCAL_ARROW_PATH: ${{ github.workspace }}/.deps/arrow-julia
         run: |
-          julia --project=. -e 'using Pkg; Pkg.test("WendaoArrow"; coverage=false)'
+          chmod +x ./scripts/test_wendao_arrow.sh
+          ./scripts/test_wendao_arrow.sh
 
   packaged-flight-stress:
     name: Nightly packaged Flight stress - ubuntu-latest
@@ -60,9 +74,18 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/checkout@v6
+        with:
+          repository: JuliaCN/arrow-julia
+          path: .deps/arrow-julia
       - uses: julia-actions/setup-julia@v2
         with:
           version: nightly
+      - name: Align arrow-julia checkout to Project.toml
+        run: |
+          ARROW_REV="$(julia -e 'using TOML; print(TOML.parsefile("Project.toml")["sources"]["Arrow"]["rev"])')"
+          git -C .deps/arrow-julia fetch --tags --prune origin
+          git -C .deps/arrow-julia checkout "${ARROW_REV}"
       - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
@@ -91,11 +114,15 @@ jobs:
       - name: Resolve and build package
         env:
           JULIA_PKG_PRECOMPILE_AUTO: "0"
+          WENDAO_ARROW_BOOTSTRAP_ENV: ${{ runner.temp }}/wendaoarrow-env
+          WENDAO_ARROW_LOCAL_ARROW_PATH: ${{ github.workspace }}/.deps/arrow-julia
         run: |
-          julia --project=. -e 'using Pkg; Pkg.resolve(); Pkg.instantiate(); Pkg.build()'
+          julia ./scripts/prepare_wendao_arrow_env.jl
       - name: Run packaged Flight stress lane
         env:
           JULIA_NUM_THREADS: "2"
+          WENDAO_ARROW_BOOTSTRAP_ENV: ${{ runner.temp }}/wendaoarrow-env
+          WENDAO_ARROW_LOCAL_ARROW_PATH: ${{ github.workspace }}/.deps/arrow-julia
           WENDAO_ARROW_STRESS_WORKERS: "4"
           WENDAO_ARROW_STRESS_SAMPLES: "4"
           WENDAO_ARROW_STRESS_REQUEST_ROWS: "32"
