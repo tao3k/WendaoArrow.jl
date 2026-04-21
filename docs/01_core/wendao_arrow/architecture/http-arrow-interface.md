@@ -3,7 +3,7 @@
 WendaoArrow no longer ships a local HTTP or IPC transport surface.
 
 The package now exposes Flight-only local transport composition through
-`Arrow.Flight.Service` plus the Arrow-provided `:purehttp2` listener path.
+`Arrow.Flight.Service` plus the packaged `:grpcserver` listener path.
 Any host-level fallback transport belongs above the WendaoArrow package
 boundary.
 

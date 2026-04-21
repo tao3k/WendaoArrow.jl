@@ -54,7 +54,7 @@ Primary docs live under:
 - Packaged network listener surface:
   `flight_server` / `serve_flight` / `serve_stream_flight`
 - Current packaged network backend support:
-  `:purehttp2` compatibility selector only
+  `:grpcserver` packaged default, with `:nghttp2` kept non-default and unsupported for full Flight server parity
 - Cross-profile contract invariant:
   `wendao.schema_version = v1`
 
@@ -66,9 +66,9 @@ contract. The packaged listener surface is Arrow Flight `DoExchange`, so any
 replacement backend must preserve request streaming, response streaming, and
 trailer-borne `grpc-status` completion. The requested `Nghttp2Wrapper.jl`
 backend now exists upstream behind the optional `Arrow.Flight.nghttp2_flight_server(...)`
-extension surface, but WendaoArrow keeps the Arrow-provided `:purehttp2`
-listener contract as its only packaged backend and fails explicit `:nghttp2`
-or retired `:grpcserver` backend requests up front.
+extension surface, but WendaoArrow keeps the packaged `:grpcserver` listener
+contract as its only supported packaged backend and fails explicit `:nghttp2`
+or retired `:purehttp2` backend requests up front.
 
 ## Quick Start
 
@@ -172,7 +172,7 @@ WendaoArrow exposes:
 - `gateway_repo_search_headers(...)` and
   `gateway_knowledge_search_headers(...)` for the runtime-owned gateway header
   contract
-- `flight_server(service)` for Arrow-provided `:purehttp2` listener composition with
+- `flight_server(service)` for packaged `:grpcserver` listener composition with
   explicit `max_active_requests`
 - `serve_flight(processor)` and `serve_stream_flight(processor)` for packaged
   Flight listeners with explicit `max_active_requests`,
@@ -307,7 +307,7 @@ packaged-benchmark-server, and config files.
 
 Current Flight verification covers:
 
-- Arrow-provided `:purehttp2` listener startup and shutdown wrappers
+- packaged `:grpcserver` listener startup and shutdown wrappers
 - request-side invalid-argument diagnostics for missing columns, duplicate
   `doc_id`, empty `doc_id`, non-numeric and non-finite `vector_score`, and
   invalid schema version
@@ -318,12 +318,13 @@ Current Flight verification covers:
 - schema metadata and field metadata preservation through packaged local Flight
   response paths
 - response `app_metadata` preservation through packaged local `DoExchange`
-- packaged benchmark-server argument coverage for the Arrow-provided
-  `:purehttp2` listener stress harness
+- packaged benchmark-server argument coverage for the packaged `:grpcserver`
+  listener stress harness
 
 The broader live-network interop and `pyarrow.flight` listener proofs now live
-upstream in `arrow-julia`'s `:purehttp2` Flight suite, while WendaoArrow keeps
-its package-local contract and listener-wrapper regression surface bounded.
+upstream in `arrow-julia`'s packaged Flight transport suites, while WendaoArrow
+keeps its package-local contract and listener-wrapper regression surface
+bounded.
 
 ## Production Runtime Guidance
 

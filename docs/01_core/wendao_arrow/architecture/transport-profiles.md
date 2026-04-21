@@ -17,7 +17,7 @@ needs to stay Flight-native:
 - Python-owned live interoperability proofs plus optional upstream extension
   backends
 - transport-agnostic server composition
-- Arrow-provided HTTP/2 listener helpers
+- packaged Flight listener helpers owned by `gRPCServer.jl`
 - Arrow-owned metadata overlay helpers
 - Arrow-owned logical and extension runtime support
 
@@ -44,7 +44,7 @@ The package exposes:
 - `build_flight_service(processor)` for table-first `DoExchange`
 - `build_stream_flight_service(processor)` for stream-first `DoExchange`
 - `flight_server`, `serve_flight`, and `serve_stream_flight` through the
-  Arrow-provided `:purehttp2` listener path
+  packaged `:grpcserver` listener path
 - `flight_listener_backend_capabilities(...)` and
   `flight_listener_backend_supported(...)` for the packaged network-listener
   backend contract, delegated to upstream `Arrow.Flight`
@@ -76,13 +76,13 @@ WendaoArrow now keeps that surface at the same abstraction level through
 upstream `Arrow.Flight.withappmetadata(...)` instead of a package-owned
 runtime carrier.
 
-Current packaged backend support remains the `:purehttp2` compatibility
-selector only. The requested
-`Nghttp2Wrapper.jl` backend is not accepted as a packaged listener backend yet
-because upstream `Arrow.Flight` ships that backend only behind the optional
-`Nghttp2Wrapper.jl` extension surface, while WendaoArrow keeps the
-Arrow-provided `:purehttp2` listener contract as the only packaged default
-backend for its listener wrappers.
+Current packaged backend support remains `:grpcserver` as the only supported
+default. The requested `Nghttp2Wrapper.jl` backend is not accepted as a
+packaged listener backend yet because upstream `Arrow.Flight` ships that
+backend only behind the optional `Nghttp2Wrapper.jl` extension surface and it
+still lacks full request-streaming and bidirectional parity. WendaoArrow also
+treats the old `:purehttp2` selector as retired legacy now that the packaged
+live backend is owned by `gRPCServer.jl`.
 
 ## Host Runtime Boundary
 
@@ -104,7 +104,7 @@ responsibilities.
 
 Near-term package work should follow these rules:
 
-- keep the Arrow-provided `:purehttp2` listener wrappers aligned with the
+- keep the packaged `:grpcserver` listener wrappers aligned with the
   stream-first processor contract
 - keep server-side Flight responses descriptor-free unless a concrete
   interoperability requirement proves otherwise

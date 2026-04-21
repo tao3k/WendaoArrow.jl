@@ -2,6 +2,7 @@ module WendaoArrow
 
 using Arrow
 using Dates
+import gRPCServer
 using Logging
 using Tables
 using TOML
@@ -78,19 +79,19 @@ function _wait_for_flight_server(server; block::Bool)
     return server
 end
 
-function _require_arrow_purehttp2_listener(subject::AbstractString)
-    isdefined(Arrow.Flight, :purehttp2_flight_server) && return
+function _require_arrow_grpcserver_listener(subject::AbstractString)
+    isdefined(Arrow.Flight, :grpcserver_flight_server) && return
     throw(
         ArgumentError(
-            "$(subject) requires an Arrow.jl revision that provides the Arrow-owned HTTP/2 listener entrypoint Arrow.Flight.purehttp2_flight_server(...)",
+            "$(subject) requires an Arrow.jl revision that provides the packaged Flight listener entrypoint Arrow.Flight.grpcserver_flight_server(...)",
         ),
     )
 end
 
 function _flight_listener_constructor(backend::Symbol, subject::AbstractString)
-    if backend == :purehttp2
-        _require_arrow_purehttp2_listener(subject)
-        return getfield(Arrow.Flight, :purehttp2_flight_server)
+    if backend == :grpcserver
+        _require_arrow_grpcserver_listener(subject)
+        return getfield(Arrow.Flight, :grpcserver_flight_server)
     end
 
     throw(ArgumentError("$(subject) does not provide a listener constructor for backend :$(backend)"))
@@ -103,7 +104,7 @@ function flight_server(
     max_active_requests::Integer = max(Threads.nthreads() * 8, 32),
     request_capacity::Integer = 16,
     response_capacity::Integer = 16,
-    backend::Symbol = :purehttp2,
+    backend::Symbol = :grpcserver,
 )
     require_flight_listener_backend(backend; subject = "WendaoArrow.flight_server")
     constructor = _flight_listener_constructor(backend, "WendaoArrow.flight_server")
@@ -127,7 +128,7 @@ function serve_flight(
     max_active_requests::Integer = max(Threads.nthreads() * 8, 32),
     request_capacity::Integer = 16,
     response_capacity::Integer = 16,
-    backend::Symbol = :purehttp2,
+    backend::Symbol = :grpcserver,
 )
     require_flight_listener_backend(backend; subject = "WendaoArrow.serve_flight")
     service = build_flight_service(
@@ -157,7 +158,7 @@ function serve_stream_flight(
     max_active_requests::Integer = max(Threads.nthreads() * 8, 32),
     request_capacity::Integer = 16,
     response_capacity::Integer = 16,
-    backend::Symbol = :purehttp2,
+    backend::Symbol = :grpcserver,
 )
     require_flight_listener_backend(backend; subject = "WendaoArrow.serve_stream_flight")
     service = build_stream_flight_service(
