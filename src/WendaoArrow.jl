@@ -17,6 +17,7 @@ include("config.jl")
 include("codec.jl")
 include("ranking_strategy.jl")
 include("contracts.jl")
+include("cdata.jl")
 include("flight.jl")
 include("listener_backend.jl")
 include("gateway_flight.jl")
@@ -36,6 +37,7 @@ export LinkGraphRetrievalModes
 export RankingStrategy
 export build_flight_service
 export build_stream_flight_service
+export cdata_interface_capabilities
 export coerce_float64
 export coerce_metadata_optional_enum
 export coerce_optional_datetime
@@ -62,6 +64,7 @@ export normalize_metadata_values
 export normalize_scoring_response
 export require_flight_listener_backend
 export require_columns
+export require_cdata_interface
 export require_column_lengths
 export require_schema_version
 export require_unique_string_column

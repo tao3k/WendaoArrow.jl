@@ -1,6 +1,4 @@
-include(
-    joinpath(@__DIR__, "..", "..", "scripts", "run_packaged_flight_benchmark_server.jl"),
-)
+include("../../scripts/run_packaged_flight_benchmark_server.jl")
 
 const PackagedFlightBenchServer = WendaoArrowPackagedFlightBenchmarkServer
 

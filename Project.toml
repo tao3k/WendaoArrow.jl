@@ -13,9 +13,10 @@ Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [sources]
-Arrow = { url = "https://github.com/JuliaCN/arrow-julia.git", rev = "82562ef144a5d8b7d488710cea609fb7488d4efe" }
-ArrowTypes = { url = "https://github.com/JuliaCN/arrow-julia.git", subdir = "src/ArrowTypes", rev = "82562ef144a5d8b7d488710cea609fb7488d4efe" }
+Arrow = { url = "https://github.com/JuliaCN/arrow-julia.git", rev = "0a9ee4617bcbe75cfaceab003c87341b6107a521" }
+ArrowTypes = { url = "https://github.com/JuliaCN/arrow-julia.git", subdir = "src/ArrowTypes", rev = "0a9ee4617bcbe75cfaceab003c87341b6107a521" }
 gRPCServer = { url = "https://github.com/tao3k/gRPCServer.jl", rev = "261cd70ac0b76c060cef0507245c400da0b5def9" }
+JuliaLangProjectHarness = { url = "https://github.com/JuliaCN/JuliaLangProjectHarness.jl.git", rev = "3e9cd83cac840df4fd37af229190b0aaccb74663" }
 
 [compat]
 Arrow = "2"
@@ -26,8 +27,13 @@ TOML = "1"
 julia = "1.12"
 
 [extras]
+JuliaLangProjectHarness = "67259778-f152-405a-bc38-ee6219bce977"
 Sockets = "6462fe0b-24de-5631-8697-dd941f90decc"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Sockets", "Test"]
+test = ["JuliaLangProjectHarness", "Sockets", "Test"]
+
+[tool.JuliaLangProjectHarness]
+advice = "report"
+advice_explanation = "stage public API documentation and verification advice while landing the Project.toml harness gate"
